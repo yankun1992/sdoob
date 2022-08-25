@@ -7,7 +7,9 @@ trait ClientPool {
 }
 
 object ClientPool {
-  def createPoolByUri(uri: String, clients: Int = 16): ClientPool = {
+  def createPoolByUri(uri: String, poolOptions: PoolOptions): ClientPool = {
     ???
   }
+
+  def apply(connectOptions: SqlConnectOptions, poolOptions: PoolOptions): ClientPool = ???
 }

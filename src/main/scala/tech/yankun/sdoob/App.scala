@@ -1,30 +1,23 @@
 package tech.yankun.sdoob
 
 import org.apache.spark.sql.SparkSession
+import tech.yankun.sdoob.driver.{ClientPool, PoolOptions}
 
 object App {
   def main(args: Array[String]): Unit = {
 
     val spark = SparkSession.builder().appName("sdoob").enableHiveSupport().getOrCreate()
 
-    val table = spark.table("")
+    val table = spark.table("").rdd
 
-    //    table.foreachPartition { partition =>
-    //      //      val pool = ClientPool.createPoolByUri("")
-    //      //      while (partition.hasNext) {
-    //      //        val client = pool.waitReadyClient()
-    //      //        // generate command
-    //      //        // write command
-    //      //        //        client.write()
-    //      //      }
-    //      partition.foreach(println)
-    //
-    //      //      val address = InetSocketAddress.createUnresolved("", 8086)
-    //      //      val socket = SocketChannel.open()
-    //      //      socket.connect(address)
-    //      //      socket.configureBlocking(false)
-    //
-    //    }
+    table.foreachPartition { partition =>
+      val poolOptions = new PoolOptions()
+      poolOptions.setMaxSize(16)
+
+      val pool = ClientPool.createPoolByUri("", poolOptions)
+
+
+    }
 
 
   }
