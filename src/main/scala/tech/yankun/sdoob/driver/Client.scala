@@ -4,7 +4,7 @@ import java.io.Closeable
 import java.net.SocketAddress
 
 abstract class Client(val options: SqlConnectOptions) extends Closeable {
-  val properties: Map[String, String] = options.getProperties.toMap
+  val properties: Map[String, String] = options.getProperties
   val server: SocketAddress = options.getSocketAddress
   val user: String = options.getUser()
   val password: String = options.getPassword()
@@ -13,8 +13,6 @@ abstract class Client(val options: SqlConnectOptions) extends Closeable {
   val cachePreparedStatements: Boolean = options.getCachePreparedStatements()
   val preparedStatementCacheSize: Int = options.getPreparedStatementCacheMaxSize()
   val preparedStatementCacheSqlFilter: String => Boolean = options.getPreparedStatementCacheSqlFilter()
-
-
 
 
   /**
