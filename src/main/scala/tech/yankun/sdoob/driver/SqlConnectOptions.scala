@@ -25,8 +25,8 @@ class SqlConnectOptions() {
   @BeanProperty var applicationLayerProtocols: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
 
   // database options
-  @BeanProperty protected var host: String = _
-  @BeanProperty protected var port: Int = _
+  @BeanProperty var host: String = _
+  @BeanProperty var port: Int = _
   @BeanProperty var user: String = _
   @BeanProperty var password: String = _
   @BeanProperty var database: String = _
@@ -35,7 +35,7 @@ class SqlConnectOptions() {
 
   @BeanProperty var preparedStatementCacheSqlFilter: String => Boolean = (sql: String) => sql.length < DEFAULT_PREPARED_STATEMENT_CACHE_SQL_LIMIT
 
-  @BeanProperty var properties = new mutable.HashMap[String, String]()
+  var properties = new mutable.HashMap[String, String]()
 
   /**
    * Copy constructor
@@ -104,6 +104,8 @@ class SqlConnectOptions() {
   }
 
   def getReconnectInterval: Long = this.reconnectInterval
+
+  def getProperties: Map[String, String] = this.properties.toMap
 
   def addProperty(key: String, value: String): this.type = {
     properties.put(key, value)
