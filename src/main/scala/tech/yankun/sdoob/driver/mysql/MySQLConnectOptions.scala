@@ -74,7 +74,7 @@ object MySQLConnectOptions {
   }
 
   def fromUri(uri: String): MySQLConnectOptions = {
-    ???
+    MySQLUriParser.parse(uri)
   }
 
   val DEFAULT_HOST: String = "localhost"
