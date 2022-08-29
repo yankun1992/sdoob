@@ -106,5 +106,5 @@ object ColumnDefinition {
     val EXPLICIT_NULL_FLAG = 0x08000000
     val FIELD_IS_MARKED = 0x10000000
   }
-  
+
 }
