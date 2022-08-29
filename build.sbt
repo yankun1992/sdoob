@@ -14,6 +14,7 @@ lazy val root = (project in file("."))
 
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.1",
     libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.3",
+    libraryDependencies += "org.log4s" %% "log4s" % "1.10.0",
 
     libraryDependencies ++= {
       CrossVersion.partialVersion(scalaVersion.value) match {
