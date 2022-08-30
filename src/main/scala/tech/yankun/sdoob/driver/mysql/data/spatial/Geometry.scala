@@ -5,7 +5,7 @@ package tech.yankun.sdoob.driver.mysql.data.spatial
  *
  * @param SRID
  */
-abstract class Geometry(private var SRID: Long) {
+abstract class Geometry(var SRID: Long) {
 
   def this(other: Geometry) {
     this(0)

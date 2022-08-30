@@ -8,7 +8,7 @@ import scala.beans.BeanProperty
  * @param SRID
  * @param points
  */
-class MultiPoint(SRID: Long, @BeanProperty var points: List[Point]) {
+class MultiPoint(SRID: Long, @BeanProperty var points: List[Point]) extends Geometry(SRID) {
 
   def this(other: MultiPoint) {
     this(other.SRID, other.points)

@@ -8,7 +8,7 @@ import scala.beans.BeanProperty
  * @param SRID
  * @param polygons
  */
-class MultiPolygon(SRID: Long, @BeanProperty var polygons: List[Polygon]) {
+class MultiPolygon(SRID: Long, @BeanProperty var polygons: List[Polygon]) extends Geometry(SRID) {
   def this(other: MultiPolygon) {
     this(other.SRID, other.polygons)
   }
