@@ -2,6 +2,7 @@ package tech.yankun.sdoob.driver.mysql
 
 import java.nio.charset.{Charset, StandardCharsets}
 import scala.collection.mutable
+import scala.util.Try
 
 /**
  * MySQL collation which is a set of rules for comparing characters in a character set.
@@ -277,10 +278,55 @@ object MySQLCollation {
 
   val SUPPORTED_CHARSET_NAMES: Array[String] = values.map(_.mysqlCharsetName)
 
-  val charsetToDefaultCollationMapping = new mutable.HashMap[String, String]()
+  val charsetToDefaultCollationMapping = mutable.Map(
+    ("big5", "big5_chinese_ci"),
+    ("dec8", "dec8_swedish_ci"),
+    ("cp850", "cp850_general_ci"),
+    ("hp8", "hp8_english_ci"),
+    ("koi8r", "koi8r_general_ci"),
+    ("latin1", "latin1_swedish_ci"),
+    ("latin2", "latin2_general_ci"),
+    ("swe7", "swe7_swedish_ci"),
+    ("ascii", "ascii_general_ci"),
+    ("ujis", "ujis_japanese_ci"),
+    ("sjis", "sjis_japanese_ci"),
+    ("hebrew", "hebrew_general_ci"),
+    ("tis620", "tis620_thai_ci"),
+    ("euckr", "euckr_korean_ci"),
+    ("koi8u", "koi8u_general_ci"),
+    ("gb2312", "gb2312_chinese_ci"),
+    ("greek", "greek_general_ci"),
+    ("cp1250", "cp1250_general_ci"),
+    ("gbk", "gbk_chinese_ci"),
+    ("latin5", "latin5_turkish_ci"),
+    ("armscii8", "armscii8_general_ci"),
+    ("utf8", "utf8_general_ci"),
+    ("ucs2", "ucs2_general_ci"),
+    ("cp866", "cp866_general_ci"),
+    ("keybcs2", "keybcs2_general_ci"),
+    ("macce", "macce_general_ci"),
+    ("macroman", "macroman_general_ci"),
+    ("cp852", "cp852_general_ci"),
+    ("latin7", "latin7_general_ci"),
+    ("utf8mb4", "utf8mb4_general_ci"),
+    ("cp1251", "cp1251_general_ci"),
+    ("utf16", "utf16_general_ci"),
+    ("utf16le", "utf16le_general_ci"),
+    ("cp1256", "cp1256_general_ci"),
+    ("cp1257", "cp1257_general_ci"),
+    ("utf32", "utf32_general_ci"),
+    ("binary", "binary"),
+    ("geostd8", "geostd8_general_ci"),
+    ("cp932", "cp932_japanese_ci"),
+    ("eucjpms", "eucjpms_japanese_ci"),
+    ("gb18030", "gb18030_chinese_ci"),
+  )
 
   val idToJavaCharsetMapping: Map[Int, Charset] =
-    values.map(collation => collation.collationId -> Charset.forName(collation.mappedJavaCharsetName)).toMap
+    values.map(collation => Try {
+      collation.collationId -> Charset.forName(collation.mappedJavaCharsetName)
+    }.toOption)
+      .filter(_.nonEmpty).map(_.get).toMap
 
   val DEFAULT_COLLATION: MySQLCollation = utf8mb4_general_ci
 
