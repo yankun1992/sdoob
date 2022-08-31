@@ -14,6 +14,8 @@ abstract class Client(val options: SqlConnectOptions) extends Closeable {
   val preparedStatementCacheSize: Int = options.getPreparedStatementCacheMaxSize()
   val preparedStatementCacheSqlFilter: String => Boolean = options.getPreparedStatementCacheSqlFilter()
 
+  initializeConfiguration(options)
+
 
   /**
    * Initialize the configuration after the common configuration have been initialized.
@@ -21,8 +23,6 @@ abstract class Client(val options: SqlConnectOptions) extends Closeable {
    * @param options the concrete options for initializing configuration by a specific client.
    */
   def initializeConfiguration(options: SqlConnectOptions): Unit
-
-  def connect(remote: SocketAddress): Unit
 
 
   def write(command: Command): Unit
