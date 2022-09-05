@@ -16,4 +16,6 @@ class InitialHandshakeCommand(val client: MySQLClient,
                               val initialCapabilitiesFlags: Int,
                               val charsetEncoding: Charset,
                               val authenticationPlugin: MySQLAuthenticationPlugin
-                             ) extends AuthenticationCommandBase(username, password, database, collation, serverRsaPublicKey, connectionAttributes)
+                             ) extends AuthenticationCommandBase(username, password, database, collation, serverRsaPublicKey, connectionAttributes) {
+  override def toString: String = "InitialHandshakeCommand"
+}

@@ -1,6 +1,4 @@
-package tech.yankun.sdoob.driver.common
-
-import tech.yankun.sdoob.driver.Command
+package tech.yankun.sdoob.driver.command
 
 class ExtendedQueryCommand extends Command {
 

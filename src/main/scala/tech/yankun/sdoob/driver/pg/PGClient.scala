@@ -1,8 +1,9 @@
 package tech.yankun.sdoob.driver.pg
 
-import tech.yankun.sdoob.driver.{Client, Command, CommandResponse, SqlConnectOptions}
+import io.netty.buffer.ByteBuf
+import tech.yankun.sdoob.driver.command.{Command, CommandResponse}
+import tech.yankun.sdoob.driver.{Client, SqlConnectOptions}
 
-import java.net.SocketAddress
 import java.nio.channels.SocketChannel
 
 class PGClient(options: SqlConnectOptions) extends Client(options) {
@@ -10,10 +11,9 @@ class PGClient(options: SqlConnectOptions) extends Client(options) {
 
   override def initializeConfiguration(options: SqlConnectOptions): Unit = ???
 
-  override def connect(remote: SocketAddress): Unit = ???
-
-
   override def write(command: Command): Unit = ???
+
+  override def sendPacket(packet: ByteBuf): Unit = ???
 
   override def read(): CommandResponse = ???
 

@@ -12,7 +12,7 @@ object App {
 
     table.foreachPartition { partition =>
       val poolOptions = new PoolOptions()
-      poolOptions.setMaxSize(16)
+      poolOptions.setSize(16)
 
       val pool = ClientPool.createPoolByUri("", poolOptions)
 

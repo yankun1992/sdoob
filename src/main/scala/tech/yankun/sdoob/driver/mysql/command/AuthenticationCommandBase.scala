@@ -1,7 +1,7 @@
 package tech.yankun.sdoob.driver.mysql.command
 
 import io.netty.buffer.ByteBuf
-import tech.yankun.sdoob.driver.Command
+import tech.yankun.sdoob.driver.command.Command
 import tech.yankun.sdoob.driver.mysql.MySQLCollation
 
 class AuthenticationCommandBase(val username: String,

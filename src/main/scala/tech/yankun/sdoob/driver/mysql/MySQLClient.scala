@@ -1,18 +1,23 @@
 package tech.yankun.sdoob.driver.mysql
 
-import io.netty.buffer.{ByteBuf, Unpooled}
+import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
+import org.log4s.getLogger
+import tech.yankun.sdoob.driver.command.{Command, CommandResponse}
 import tech.yankun.sdoob.driver.mysql.codec.{CommandCodec, InitialHandshakeCommandCodec}
 import tech.yankun.sdoob.driver.mysql.command.InitialHandshakeCommand
 import tech.yankun.sdoob.driver.mysql.protocol.CapabilitiesFlag.{CLIENT_CONNECT_ATTRS, CLIENT_CONNECT_WITH_DB, CLIENT_FOUND_ROWS, CLIENT_SUPPORTED_CAPABILITIES_FLAGS}
-import tech.yankun.sdoob.driver.{Client, Command, CommandResponse, SqlConnectOptions}
+import tech.yankun.sdoob.driver.{Client, SqlConnectOptions}
 
-import java.nio.channels.SocketChannel
+import java.nio.channels.{SelectableChannel, SocketChannel}
 import java.nio.charset.Charset
 import java.util
+import scala.beans.BeanProperty
 
-class MySQLClient(options: MySQLConnectOptions) extends Client(options) {
+class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None) extends Client(options) {
 
   import MySQLClient._
+
+  private[this] val logger = getLogger
 
   private var collation: MySQLCollation = _
   private var charsetEncoding: Charset = _
@@ -32,28 +37,44 @@ class MySQLClient(options: MySQLConnectOptions) extends Client(options) {
 
   var metadata: MySQLDatabaseMetadata = _
 
-  private val socket = SocketChannel.open()
-  init()
+  val allocator: PooledByteBufAllocator = parent.map(_.alloc).getOrElse(PooledByteBufAllocator.DEFAULT)
+  var buffer: ByteBuf = _
+
+  @BeanProperty var bufferRemain: Boolean = false
+
+  val socket: SocketChannel = SocketChannel.open()
+
+  var inited: Boolean = false
+
+  def isInit: Boolean = inited
+
+  def connect(): Unit = {
+    // connect to server
+    try {
+      socket.connect(server)
+    } catch {
+      case x: Throwable =>
+        try socket.close()
+        catch {
+          case suppressed: Throwable =>
+            x.addSuppressed(suppressed)
+        }
+        throw x
+    }
+
+    this.status = Client.ST_CLIENT_CONNECTED
+  }
 
   def init(): Unit = {
-    // connect to server
-    socket.connect(server)
-    // send login message
     sendStartupMessage(options.getUser, options.getPassword, options.getDatabase, collation,
       options.serverRsaPublicKeyValue, options.getProperties, options.getSslMode, initialCapabilitiesFlags,
       charsetEncoding, options.getAuthenticationPlugin
     )
-
-    // handshake
-    val buffer = Unpooled.directBuffer(4096)
-    buffer.writeBytes(socket, 4096)
-
-    decode(buffer)
-
-    buffer.readBytes(socket, 4096)
-
-
+    inited = true
+    logger.info(s"client[${clientId}] send startup message")
   }
+
+  def configureBlocking(block: Boolean): SelectableChannel = socket.configureBlocking(block)
 
   override def initializeConfiguration(options: SqlConnectOptions): Unit = {
     val myOptions = options.asInstanceOf[MySQLConnectOptions]
@@ -90,21 +111,78 @@ class MySQLClient(options: MySQLConnectOptions) extends Client(options) {
     codec.encode(this)
   }
 
+  def handleCommandResponse(res: AnyRef): Unit = {
+    val codec = inflight.poll()
+    res match {
+      case exception: Exception =>
+        throw exception
+      case _ => logger.info(s"Command[${codec.cmd}] response is ${res}")
+    }
+  }
+
+  override def sendPacket(packet: ByteBuf): Unit = {
+    val len = packet.readableBytes()
+    val writeLen = packet.readBytes(socket, len)
+    assert(len == writeLen)
+  }
+
+  def readChannel(): Unit = {
+    val buf = getByteBuf(true)
+    val writableBytes = buf.writableBytes()
+    val read = buf.writeBytes(socket, writableBytes)
+    decode(buf)
+  }
+
+  def getByteBuf(inRead: Boolean = false): ByteBuf = {
+    if (bufferRemain && inRead) {
+      buffer
+    } else if (inRead) {
+      this.buffer = allocator.directBuffer(8 * 1024)
+      this.buffer
+    } else {
+      allocator.directBuffer(8 * 1024)
+    }
+  }
+
+  def release(buffer: ByteBuf): Unit = {
+    if (buffer != this.buffer) {
+      buffer.release()
+    } else if (bufferRemain && buffer == this.buffer) {
+      //      this.buffer.discardReadBytes()
+    } else {
+      this.buffer = null
+      buffer.release()
+    }
+  }
+
   protected def decode(in: ByteBuf): Unit = if (in.readableBytes() > 4) {
     val packetStart = in.readerIndex()
     val length = in.readUnsignedMediumLE()
     val sequenceId: Int = in.readUnsignedByte()
 
-    if (in.readableBytes() >= length) {
-      decodePacket(in.readSlice(length), length, sequenceId)
+    if (in.readableBytes() == length) {
+      logger.info(s"client[${clientId}] decode payload with ${length} len")
+      bufferRemain = false
+      decodePacket(in, length, sequenceId)
+    } else if (in.readableBytes() > length) {
+      bufferRemain = true
+      this.buffer = in
+      logger.info(s"client[${clientId}] bigger packet with len ${in.readableBytes()}")
+      decodePacket(in, length, sequenceId)
+      decode(in)
     } else {
+      bufferRemain = true
+      this.buffer = in
       in.readerIndex(packetStart)
     }
+  } else {
+    bufferRemain = true
+    this.buffer = in
   }
 
   private def decodePacket(payload: ByteBuf, length: Int, sequenceId: Int): Unit = {
     val codec = inflight.peek()
-    codec.sequenceId += 1
+    codec.sequenceId = sequenceId + 1
     codec.decodePayload(payload, length)
     //TODO forget commands
   }
@@ -135,6 +213,7 @@ object MySQLClient {
     cmd match {
       case command: InitialHandshakeCommand =>
         new InitialHandshakeCommandCodec(command)
+
       case _ =>
         ???
     }

@@ -46,7 +46,6 @@ object MySQLUriParser {
         port.foreach(p => options.setPort(p))
         schema.foreach(sc => options.setDatabase(sc))
         attributes.foreach(att => att.foreach { case (key, value) => options.addProperty(key, value) })
-        println(designator)
       case failure: Parsed.Failure =>
         throw new IllegalArgumentException(s"the JDBC URL format is incorrect with: ${failure.msg}")
     }

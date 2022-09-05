@@ -9,7 +9,7 @@ import scala.beans.BeanProperty
  * @param SRID
  * @param lineStrings
  */
-class Polygon(SRID: Long, @BeanProperty var lineStrings: List[LineString]) {
+class Polygon(SRID: Long, @BeanProperty var lineStrings: List[LineString]) extends Geometry(SRID) {
 
   def this(other: Polygon) {
     this(other.SRID, other.lineStrings)
