@@ -51,6 +51,32 @@ class MySQLPool(options: PoolOptions, connectOptions: MySQLConnectOptions) {
     logger.info("end while")
   }
 
+  def getReadyClient(): Option[MySQLClient] = {
+    parseResult()
+    connectedClients.find { case (idx, client) =>
+      client.writeable
+    }.map(_._2)
+  }
+
+  def parseResult(): Unit = {
+    var existsWriteable = connectedClients.exists(_._2.writeable)
+    while (!existsWriteable) {
+      selector.select(1000)
+      val keys = selector.selectedKeys().iterator()
+      while (keys.hasNext) {
+        val key = keys.next()
+        keys.remove()
+        if (key.isReadable) {
+          val client = key.attachment().asInstanceOf[MySQLClient]
+          client.readChannel()
+          if (client.writeable) {
+            existsWriteable = true
+          }
+        }
+      }
+    }
+  }
+
 
 }
 

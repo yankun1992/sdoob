@@ -17,7 +17,7 @@ class SimpleQueryCommandCodec(cmd: SimpleQueryCommand, format: DataFormat = Data
     packet.writeMediumLE(0)
     packet.writeByte(sequenceId)
     packet.writeByte(CommandType.COM_QUERY)
-    packet.writeCharSequence(cmd.sql(), client.encodingCharset)
+    packet.writeCharSequence(cmd.sql, client.encodingCharset)
 
     // set payload length
     val payloadLength = packet.writerIndex - startIdx - 4
@@ -30,10 +30,14 @@ class SimpleQueryCommandCodec(cmd: SimpleQueryCommand, format: DataFormat = Data
   override protected def handleInitPacket(payload: ByteBuf): Unit = {
     val firstByte = payload.getUnsignedByte(payload.readerIndex())
     firstByte match {
-      case OK_PACKET_HEADER => ???
-      case ERROR_PACKET_HEADER => ???
+      case OK_PACKET_HEADER =>
+        val ok = decodeOkPacket(payload)
+        client.release(payload)
+        client.handleCommandResponse(ok)
+      case ERROR_PACKET_HEADER =>
+        handErrorPacket(payload)
       case 0xFB => ???
-      case _ => ???
+      case _ => handleResultsetColumnCountPacketBody(payload)
     }
   }
 }

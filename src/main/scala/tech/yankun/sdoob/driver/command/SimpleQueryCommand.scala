@@ -1,6 +1,6 @@
 package tech.yankun.sdoob.driver.command
 
-case class SimpleQueryCommand() extends QueryCommandBase {
-
-  override def sql(): String = ???
+case class SimpleQueryCommand(override val sql: String, singleton: Boolean = false,
+                              override val autoCommit: Boolean = true)
+  extends QueryCommandBase(autoCommit) {
 }

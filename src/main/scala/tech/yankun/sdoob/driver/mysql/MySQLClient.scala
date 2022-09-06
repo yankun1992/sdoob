@@ -2,8 +2,8 @@ package tech.yankun.sdoob.driver.mysql
 
 import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
 import org.log4s.getLogger
-import tech.yankun.sdoob.driver.command.{Command, CommandResponse}
-import tech.yankun.sdoob.driver.mysql.codec.{CommandCodec, InitialHandshakeCommandCodec}
+import tech.yankun.sdoob.driver.command.{Command, CommandResponse, SimpleQueryCommand}
+import tech.yankun.sdoob.driver.mysql.codec.{CommandCodec, InitialHandshakeCommandCodec, SimpleQueryCommandCodec}
 import tech.yankun.sdoob.driver.mysql.command.InitialHandshakeCommand
 import tech.yankun.sdoob.driver.mysql.protocol.CapabilitiesFlag.{CLIENT_CONNECT_ATTRS, CLIENT_CONNECT_WITH_DB, CLIENT_FOUND_ROWS, CLIENT_SUPPORTED_CAPABILITIES_FLAGS}
 import tech.yankun.sdoob.driver.{Client, SqlConnectOptions}
@@ -111,6 +111,8 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     codec.encode(this)
   }
 
+  def writeable: Boolean = isAuthenticated && inflight.isEmpty
+
   def handleCommandResponse(res: AnyRef): Unit = {
     val codec = inflight.poll()
     res match {
@@ -167,8 +169,9 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     } else if (in.readableBytes() > length) {
       bufferRemain = true
       this.buffer = in
-      logger.info(s"client[${clientId}] bigger packet with len ${in.readableBytes()}")
+      logger.info(s"client[${clientId}] packet remain len ${in.readableBytes() - length}, current decode ${length} payload")
       decodePacket(in, length, sequenceId)
+      in.readerIndex(packetStart + 4 + length)
       decode(in)
     } else {
       bufferRemain = true
@@ -184,7 +187,6 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     val codec = inflight.peek()
     codec.sequenceId = sequenceId + 1
     codec.decodePayload(payload, length)
-    //TODO forget commands
   }
 
   override def read(): CommandResponse = ???
@@ -213,7 +215,8 @@ object MySQLClient {
     cmd match {
       case command: InitialHandshakeCommand =>
         new InitialHandshakeCommandCodec(command)
-
+      case command: SimpleQueryCommand =>
+        new SimpleQueryCommandCodec(command)
       case _ =>
         ???
     }
