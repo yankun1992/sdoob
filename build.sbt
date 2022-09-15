@@ -2,38 +2,29 @@
 enablePlugins(PackPlugin)
 packMain := Map("sdoob" -> "tech.yankun.sdoob.SubmitApp")
 packJvmOpts := Map("sdoob" -> Seq("-Xmx128m"))
-packExtraClasspath := Map("sdoob" -> Seq("$SPARK_CLASSPATH"))
+packExtraClasspath := Map("sdoob" -> Seq("$SPARK_CLASSPATH", "${PROG_HOME}/conf"))
 packJarListFile := Some("lib/jars.mf")
 
-lazy val scala212 = "2.12.7"
-lazy val scala211 = "2.11.8"
-lazy val scala213 = "2.13.0"
-lazy val supportedScalaVersions = List(scala212, scala211, scala213)
+/**
+ * cross build by build.py
+ *
+ * build.py will change [[packScalaVersion]] and [[packSparkVersion]] to version matrix.
+ */
+lazy val packScalaVersion = "2.11.8"
+lazy val packSparkVersion = "2.4.8"
 
 ThisBuild / organization := "tech.yankun"
 ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion := scala211
+ThisBuild / scalaVersion := packScalaVersion
 
 lazy val root = (project in file("."))
   .settings(
     name := "sdoob",
-    crossScalaVersions := supportedScalaVersions,
 
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
     libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.3",
     libraryDependencies += "org.log4s" %% "log4s" % "1.10.0",
     libraryDependencies += "com.github.pathikrit" %% "better-files" % "3.9.1",
+    libraryDependencies += "org.apache.spark" %% "spark-sql" % packSparkVersion % "provided"
 
-
-    libraryDependencies ++= {
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((2, 12)) =>
-          List("org.apache.spark" %% "spark-sql" % "2.4.0" % "provided")
-        case Some((2, 13)) =>
-          List("org.apache.spark" %% "spark-sql" % "3.2.0" % "provided")
-        case Some((2, 11)) =>
-          List("org.apache.spark" %% "spark-sql" % "2.3.0" % "provided")
-        case _ => Nil
-      }
-    },
   )
