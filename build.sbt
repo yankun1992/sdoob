@@ -1,7 +1,7 @@
 // sbt-pack settings
 enablePlugins(PackPlugin)
 packMain := Map("sdoob" -> "tech.yankun.sdoob.SubmitApp")
-packJvmOpts := Map("sdoob" -> Seq("-Xmx128m"))
+packJvmOpts := Map("sdoob" -> Seq("-Xms124m", "-Xmx512m"))
 packExtraClasspath := Map("sdoob" -> Seq("$SPARK_CLASSPATH", "${PROG_HOME}/conf"))
 packJarListFile := Some("lib/jars.mf")
 
