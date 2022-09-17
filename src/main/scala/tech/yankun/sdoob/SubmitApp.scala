@@ -6,8 +6,10 @@ import org.log4s.getLogger
 import scopt.OParser
 import tech.yankun.sdoob.AppInfo.appVersion
 import tech.yankun.sdoob.args.{ArgsConfig, CmdParser}
+import tech.yankun.sdoob.utils.Utils
 
 import java.util.Properties
+import scala.language.implicitConversions
 
 /**
  * Command line interface for the Sdoob launcher. Used internally by Sdoob scripts.
@@ -52,9 +54,9 @@ object SubmitApp {
     if (properties.containsKey("deploy-mode")) config = config.copy(sparkArgs = config.sparkArgs.copy(`deploy-mode` = properties.getProperty("deploy-mode")))
     if (properties.containsKey("driver-memory")) config = config.copy(sparkArgs = config.sparkArgs.copy(`driver-memory` = properties.getProperty("driver-memory")))
     if (properties.containsKey("executor-memory")) config = config.copy(sparkArgs = config.sparkArgs.copy(`executor-memory` = properties.getProperty("executor-memory")))
-    if (properties.containsKey("verbose") && properties.getProperty("verbose").asInstanceOf[Boolean]) config = config.copy(sparkArgs = config.sparkArgs.copy(verbose = true))
+    if (properties.containsKey("verbose") && Utils.string2Boolean(properties.getProperty("verbose"))) config = config.copy(sparkArgs = config.sparkArgs.copy(verbose = true))
     if (properties.containsKey("driver-cores")) config = config.copy(sparkArgs = config.sparkArgs.copy(`driver-cores` = properties.getProperty("driver-cores").toInt))
-    if (properties.containsKey("supervise") && properties.getProperty("supervise").asInstanceOf[Boolean]) config = config.copy(sparkArgs = config.sparkArgs.copy(supervise = true))
+    if (properties.containsKey("supervise") && Utils.string2Boolean(properties.getProperty("supervise"))) config = config.copy(sparkArgs = config.sparkArgs.copy(supervise = true))
     if (properties.containsKey("executor-cores")) config = config.copy(sparkArgs = config.sparkArgs.copy(`executor-cores` = properties.getProperty("executor-cores").toInt))
     if (properties.containsKey("queue")) config = config.copy(sparkArgs = config.sparkArgs.copy(queue = properties.getProperty("queue")))
     if (properties.containsKey("num-executors")) config = config.copy(sparkArgs = config.sparkArgs.copy(`num-executors` = properties.getProperty("num-executors").toInt))
