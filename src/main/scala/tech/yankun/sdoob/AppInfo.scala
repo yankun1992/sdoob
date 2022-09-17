@@ -5,6 +5,8 @@ import better.files.File
 object AppInfo {
   def appVersion: String = System.getProperty("prog.version")
 
+  def appHome: String = System.getProperty("prog.home")
+
   val copyrightStart = 2022
 
   val author = "Yan Kun<1939810907@qq.com>"
