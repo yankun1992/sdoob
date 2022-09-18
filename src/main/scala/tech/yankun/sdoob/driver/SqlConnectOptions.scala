@@ -6,7 +6,7 @@ import java.net.{InetSocketAddress, SocketAddress}
 import scala.beans.BeanProperty
 import scala.collection.mutable
 
-class SqlConnectOptions() {
+class SqlConnectOptions() extends Serializable {
 
   import SqlConnectOptions._
 

@@ -28,7 +28,8 @@ object SubmitApp {
           case "help" =>
             OParser.parse(CmdParser.parser, Array("--help"), ArgsConfig())
           case _ =>
-            val submitCommandLine = generateSubmitArgs(argsConfig)
+            val config = checkAndCorrectArgs(argsConfig)
+            val submitCommandLine = generateSubmitArgs(config)
             logger.warn(s"spark submit command line args is ${submitCommandLine.mkString("[", " ", "]")}")
             SdoobSubmit.submit(submitCommandLine)
         }
@@ -61,6 +62,20 @@ object SubmitApp {
     if (properties.containsKey("queue")) config = config.copy(sparkArgs = config.sparkArgs.copy(queue = properties.getProperty("queue")))
     if (properties.containsKey("num-executors")) config = config.copy(sparkArgs = config.sparkArgs.copy(`num-executors` = properties.getProperty("num-executors").toInt))
 
+    config
+  }
+
+  private def checkAndCorrectArgs(argsConfig: ArgsConfig): ArgsConfig = {
+    var config = argsConfig
+    argsConfig.appArgs.command match {
+      case "import" =>
+        if (argsConfig.sparkArgs.master.startsWith("local")) config = config.copy(sparkArgs = config.sparkArgs.copy(master = "local[1]"))
+        if (argsConfig.sparkArgs.`executor-cores` > 1 || argsConfig.sparkArgs.`num-executors` > 1) {
+          logger.warn("import dataset form rdbms to hdfs only support one thread")
+          config = config.copy(sparkArgs = config.sparkArgs.copy(`executor-cores` = 1, `num-executors` = 1))
+        }
+      case "export" =>
+    }
     config
   }
 }

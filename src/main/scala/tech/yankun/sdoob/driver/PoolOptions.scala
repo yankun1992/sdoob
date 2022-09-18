@@ -2,7 +2,7 @@ package tech.yankun.sdoob.driver
 
 import scala.beans.BeanProperty
 
-class PoolOptions {
+class PoolOptions extends Serializable {
   @BeanProperty var size: Int = _
 }
 

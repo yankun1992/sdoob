@@ -23,13 +23,13 @@ case class AppArgs(
                     columns: Seq[String] = Seq.empty,
                     `delete-target-dir`: Boolean = false,
                     query: Option[String] = None,
-                    `split-by`: Option[String] = None,
-                    `split-limit`: Option[String] = None,
+                    //                    `split-by`: Option[String] = None,
+                    //                    `split-limit`: Option[String] = None,
                     `target-dir`: Option[String] = None,
                     `temporary-rootdir`: String = "_sdoob",
                     `warehouse-dir`: Option[String] = None,
                     compress: Boolean = false,
-                    `compression-codec`: String = "gzip",
+                    `compression-codec`: String = "snappy",
                     `null-string`: Option[String] = None,
                     `null-non-string`: Option[AnyVal] = None,
                     `fields-terminated-by`: Option[String] = None,
@@ -49,6 +49,7 @@ case class AppArgs(
     buffer.toArray
   }
 }
+
 
 /** Spark Args for SparkSubmit */
 case class SparkArgs(
