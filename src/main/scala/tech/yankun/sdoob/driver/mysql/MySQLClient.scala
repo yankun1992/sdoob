@@ -32,6 +32,9 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
   // mysql codec inflight
   private val inflight: util.ArrayDeque[CommandCodec[_, MySQLClient]] = new util.ArrayDeque[CommandCodec[_, MySQLClient]]()
 
+  // current running codec
+  private var flightCodec: CommandCodec[_, MySQLClient] = null
+
   var clientCapabilitiesFlag: Int = _
   var encodingCharset: Charset = _
 
@@ -45,6 +48,16 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
   val socket: SocketChannel = SocketChannel.open()
 
   var inited: Boolean = false
+
+  private var pauseCodec: Boolean = false
+
+  def setPauseCodec(status: Boolean): Unit = pauseCodec = status
+
+  def clientIsPause: Boolean = pauseCodec
+
+  def currentCodec: CommandCodec[_, MySQLClient] = flightCodec
+
+  def codecCompleted: Boolean = inflight.isEmpty
 
   def isInit: Boolean = inited
 
@@ -115,10 +128,12 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
 
   def handleCommandResponse(res: AnyRef): Unit = {
     val codec = inflight.poll()
+    if (!inflight.isEmpty) flightCodec = inflight.peek() else flightCodec = null
     res match {
       case exception: Exception =>
         throw exception
-      case _ => logger.info(s"Command[${codec.cmd}] response is ${res}")
+      case _ =>
+        logger.info(s"Command[${codec.cmd}] response is ${res}")
     }
   }
 
@@ -132,32 +147,50 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     val buf = getByteBuf(true)
     val writableBytes = buf.writableBytes()
     val read = buf.writeBytes(socket, writableBytes)
-    decode(buf)
+    logger.info(s"read channel $read bytes")
+    while (decode(buf) && !pauseCodec) {}
   }
 
   def getByteBuf(inRead: Boolean = false): ByteBuf = {
     if (bufferRemain && inRead) {
       buffer
     } else if (inRead) {
-      this.buffer = allocator.directBuffer(8 * 1024)
+      //      assert(this.buffer == null)
+      this.buffer = allocator.directBuffer(BUFFER_SIZE)
       this.buffer
     } else {
-      allocator.directBuffer(8 * 1024)
+      allocator.directBuffer(BUFFER_SIZE)
     }
   }
 
   def release(buffer: ByteBuf): Unit = {
     if (buffer != this.buffer) {
       buffer.release()
-    } else if (bufferRemain && buffer == this.buffer) {
+    } else if (bufferRemain) {
       //      this.buffer.discardReadBytes()
+    } else if (!bufferRemain && parent.isEmpty) {
+      this.buffer.clear()
+      bufferRemain = true
     } else {
       this.buffer = null
       buffer.release()
     }
   }
 
-  protected def decode(in: ByteBuf): Unit = if (in.readableBytes() > 4) {
+  private def discard(): Unit = if (this.buffer != null) {
+    if (this.buffer.readerIndex() > BUFFER_SIZE * 3.0 / 4.0) this.buffer.discardReadBytes()
+    else if (!this.buffer.isWritable && this.buffer.readerIndex() > 0) this.buffer.discardReadBytes()
+    else if (this.buffer.readerIndex() == 0 && !this.buffer.isWritable) {
+      // big payload , change buffer
+      val buffer = this.buffer
+      this.buffer = allocator.directBuffer(BIG_BUFFER_SIZE)
+      this.buffer.writeBytes(buffer)
+      buffer.release()
+      logger.warn("upgrade buffer to big buffer")
+    }
+  }
+
+  protected def decode(in: ByteBuf): Boolean = if (in.readableBytes() > 4) {
     val packetStart = in.readerIndex()
     val length = in.readUnsignedMediumLE()
     val sequenceId: Int = in.readUnsignedByte()
@@ -166,25 +199,31 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
       logger.info(s"client[${clientId}] decode payload with ${length} len")
       bufferRemain = false
       decodePacket(in, length, sequenceId)
+      false
     } else if (in.readableBytes() > length) {
       bufferRemain = true
       this.buffer = in
       logger.info(s"client[${clientId}] packet remain len ${in.readableBytes() - length}, current decode ${length} payload")
       decodePacket(in, length, sequenceId)
       in.readerIndex(packetStart + 4 + length)
-      decode(in)
+      true
     } else {
       bufferRemain = true
       this.buffer = in
       in.readerIndex(packetStart)
+      discard()
+      false
     }
   } else {
     bufferRemain = true
     this.buffer = in
+    discard()
+    false
   }
 
   private def decodePacket(payload: ByteBuf, length: Int, sequenceId: Int): Unit = {
     val codec = inflight.peek()
+    flightCodec = codec
     codec.sequenceId = sequenceId + 1
     codec.decodePayload(payload, length)
   }
@@ -211,6 +250,9 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
 }
 
 object MySQLClient {
+  protected val BUFFER_SIZE: Int = 4 * 1024
+  protected val BIG_BUFFER_SIZE: Int = 128 * 1024
+
   def wrap(cmd: Command): CommandCodec[_, MySQLClient] = {
     cmd match {
       case command: InitialHandshakeCommand =>
