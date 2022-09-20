@@ -107,4 +107,6 @@ object ColumnDefinition {
     val FIELD_IS_MARKED = 0x10000000
   }
 
+  def isUnsignedNumeric(flags: Int): Boolean = (flags & ColumnDefinitionFlags.UNSIGNED_FLAG) != 0
+
 }

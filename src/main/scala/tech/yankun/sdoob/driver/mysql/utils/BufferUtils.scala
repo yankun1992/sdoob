@@ -64,4 +64,23 @@ object BufferUtils {
     readFixedLengthString(buffer, length.toInt, charset)
   }
 
+  def readDecStrAsLong(len: Int, buffer: ByteBuf): Long = {
+    var index = buffer.readerIndex()
+    var value: Long = 0
+    if (len > 0) {
+      val to = index + len
+      val neg = if (buffer.getByte(index) == '-') {
+        index += 1
+        true
+      } else false
+      while (index < to) {
+        value = value * 10 + (buffer.getByte(index) - '0')
+        index += 1
+      }
+      if (neg) value = -value
+      buffer.skipBytes(len)
+    }
+    value
+  }
+
 }

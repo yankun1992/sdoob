@@ -319,7 +319,7 @@ object MySQLCollation {
     ("geostd8", "geostd8_general_ci"),
     ("cp932", "cp932_japanese_ci"),
     ("eucjpms", "eucjpms_japanese_ci"),
-    ("gb18030", "gb18030_chinese_ci"),
+    ("gb18030", "gb18030_chinese_ci")
   )
 
   val idToJavaCharsetMapping: Map[Int, Charset] =

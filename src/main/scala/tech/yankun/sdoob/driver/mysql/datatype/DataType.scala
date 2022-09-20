@@ -47,6 +47,14 @@ object DataType {
   private[this] val logger = getLogger
   private val idToDataType = collection.mutable.Map.empty[Int, DataType]
 
+  val values: Array[DataType] = Array(INT1, INT2, INT3, INT4, INT8, DOUBLE, FLOAT, NUMERIC, STRING, VARSTRING,
+    TINYBLOB, BLOB, MEDIUMBLOB, LONGBLOB, DATE, TIME, DATETIME, YEAR, TIMESTAMP, BIT, JSON, GEOMETRY, GEOMETRY,
+    NULL, UNBIND)
+
+  for (elem <- values) {
+    idToDataType.put(elem.id, elem)
+  }
+
   def valueOf(value: Int): DataType = {
     idToDataType.get(value) match {
       case Some(value) => value
