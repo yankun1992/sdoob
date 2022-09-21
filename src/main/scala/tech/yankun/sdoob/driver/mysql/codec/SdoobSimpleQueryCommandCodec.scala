@@ -3,10 +3,11 @@ package tech.yankun.sdoob.driver.mysql.codec
 import io.netty.buffer.ByteBuf
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.{StructField, StructType}
+import tech.yankun.sdoob.driver.Dialect
 import tech.yankun.sdoob.driver.command.{SdoobSimpleQueryCommand, SimpleQueryCommand}
 import tech.yankun.sdoob.driver.mysql.codec.QueryCommandBaseCodec.{HANDLING_COLUMN_DEFINITION, HANDLING_ROW_DATA_OR_END_PACKET}
 import tech.yankun.sdoob.driver.mysql.datatype.{DataFormat, RowValueCodec}
-import tech.yankun.sdoob.utils.Utils
+import tech.yankun.sdoob.driver.mysql.protocol.ColumnDefinition
 
 import scala.collection.mutable
 
@@ -31,7 +32,16 @@ class SdoobSimpleQueryCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFor
   override protected def handleColumnDefinitions(payload: ByteBuf): Unit = {
     super.handleColumnDefinitions(payload)
     if (commandHandlerState != HANDLING_COLUMN_DEFINITION) {
-      schema = StructType(columnDefinitions.map(column => StructField(name = column.name, dataType = Utils.jdbcType2sparkType(column.jdbcType))))
+      val dialect = Dialect.get("mysql")
+      val fields = for (column <- columnDefinitions) yield {
+        val datatype = dialect.getSparkType(column.jdbcType.getVendorTypeNumber, column.jdbcType.getName, column.columnLength.toInt) match {
+          case Some(value) => value
+          case None =>
+            Dialect.getSparkType(column.jdbcType.getVendorTypeNumber, 0, 0, ColumnDefinition.isUnsignedNumeric(column.flags))
+        }
+        StructField(column.name, datatype)
+      }
+      schema = StructType(fields)
       rowBuffer = new mutable.ArrayBuffer(columnDefinitions.length)
     }
   }
