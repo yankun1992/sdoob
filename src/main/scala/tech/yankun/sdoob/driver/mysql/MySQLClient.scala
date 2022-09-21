@@ -2,8 +2,8 @@ package tech.yankun.sdoob.driver.mysql
 
 import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
 import org.log4s.getLogger
-import tech.yankun.sdoob.driver.command.{Command, CommandResponse, SimpleQueryCommand}
-import tech.yankun.sdoob.driver.mysql.codec.{CommandCodec, InitialHandshakeCommandCodec, SimpleQueryCommandCodec}
+import tech.yankun.sdoob.driver.command.{Command, CommandResponse, SdoobSimpleQueryCommand, SimpleQueryCommand}
+import tech.yankun.sdoob.driver.mysql.codec.{CommandCodec, InitialHandshakeCommandCodec, SdoobSimpleQueryCommandCodec, SimpleQueryCommandCodec}
 import tech.yankun.sdoob.driver.mysql.command.InitialHandshakeCommand
 import tech.yankun.sdoob.driver.mysql.protocol.CapabilitiesFlag.{CLIENT_CONNECT_ATTRS, CLIENT_CONNECT_WITH_DB, CLIENT_FOUND_ROWS, CLIENT_SUPPORTED_CAPABILITIES_FLAGS}
 import tech.yankun.sdoob.driver.{Client, SqlConnectOptions}
@@ -120,6 +120,7 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
 
   override def write(command: Command): Unit = {
     val codec: CommandCodec[_, MySQLClient] = wrap(command)
+    if (inflight.isEmpty) flightCodec = codec
     inflight.addLast(codec)
     codec.encode(this)
   }
@@ -196,14 +197,14 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     val sequenceId: Int = in.readUnsignedByte()
 
     if (in.readableBytes() == length) {
-      logger.info(s"client[${clientId}] decode payload with ${length} len")
+      //      logger.info(s"client[${clientId}] decode payload with ${length} len")
       bufferRemain = false
       decodePacket(in, length, sequenceId)
       false
     } else if (in.readableBytes() > length) {
       bufferRemain = true
       this.buffer = in
-      logger.info(s"client[${clientId}] packet remain len ${in.readableBytes() - length}, current decode ${length} payload")
+      //      logger.info(s"client[${clientId}] packet remain len ${in.readableBytes() - length}, current decode ${length} payload")
       decodePacket(in, length, sequenceId)
       in.readerIndex(packetStart + 4 + length)
       true
@@ -250,7 +251,7 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
 }
 
 object MySQLClient {
-  protected val BUFFER_SIZE: Int = 4 * 1024
+  protected val BUFFER_SIZE: Int = 8 * 1024
   protected val BIG_BUFFER_SIZE: Int = 128 * 1024
 
   def wrap(cmd: Command): CommandCodec[_, MySQLClient] = {
@@ -259,6 +260,7 @@ object MySQLClient {
         new InitialHandshakeCommandCodec(command)
       case command: SimpleQueryCommand =>
         new SimpleQueryCommandCodec(command)
+      case command: SdoobSimpleQueryCommand => new SdoobSimpleQueryCommandCodec(command)
       case _ =>
         ???
     }

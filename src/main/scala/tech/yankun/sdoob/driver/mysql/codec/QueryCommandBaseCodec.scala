@@ -91,11 +91,16 @@ abstract class QueryCommandBaseCodec[C <: QueryCommandBase](cmd: C, val format: 
       }
       client.release(payload)
       handleSingleDecodingCompleted(serverStatusFlags, affectedRows, lastInsertId)
+      client.handleCommandResponse(s"affect rows: ${affectedRows}")
     } else {
       logger.info("decode rows")
+      decodeRow(columnDefinitions.length, payload)
+      client.release(payload)
     }
 
   }
+
+  protected def decodeRow(length: Int, payload: ByteBuf): Unit = {}
 
   protected def handleSingleDecodingCompleted(serverFlags: Int, affected: Long, lastId: Long): Unit = {
 
