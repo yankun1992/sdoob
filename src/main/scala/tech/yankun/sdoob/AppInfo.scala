@@ -9,7 +9,9 @@ object AppInfo {
 
   val copyrightStart = 2022
 
-  val author = "Yan Kun<1939810907@qq.com>"
+  val appAuthor = "Yan Kun<1939810907@qq.com>"
+
+  val scalaVersion = util.Properties.versionString
 
   def appDependencies: Seq[String] = {
     val home = File(System.getProperty("prog.home"))

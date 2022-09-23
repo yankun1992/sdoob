@@ -28,6 +28,7 @@ case class AppArgs(
                     `target-dir`: Option[String] = None,
                     `temporary-rootdir`: String = "_sdoob",
                     `warehouse-dir`: Option[String] = None,
+                    where: Option[String] = None,
                     compress: Boolean = false,
                     `compression-codec`: String = "snappy",
                     `null-string`: Option[String] = None,
@@ -45,6 +46,8 @@ case class AppArgs(
         buffer.append(x)
       case None =>
     }
+    buffer.append("--table")
+    buffer.append(table.get)
 
     buffer.toArray
   }

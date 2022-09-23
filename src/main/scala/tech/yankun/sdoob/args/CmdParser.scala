@@ -1,7 +1,6 @@
 package tech.yankun.sdoob.args
 
 import scopt.OParser
-import tech.yankun.sdoob.AppInfo
 import tech.yankun.sdoob.AppInfo._
 
 import java.time.LocalDate
@@ -18,7 +17,7 @@ object CmdParser {
       opt[String]("username").action((x, c) => c.copy(appArgs = c.appArgs.copy(username = Some(x)))).text("Set authentication username"),
       opt[String]("password").action((x, c) => c.copy(appArgs = c.appArgs.copy(password = Some(x)))).text("Set authentication password"),
       opt[String]("password-file").action((x, c) => c.copy()).text("Set authentication password file path"),
-      opt[String]("table").action((x, c) => c.copy()).text("")
+      opt[String]("table").action((x, c) => c.copy(appArgs = c.appArgs.copy(table = Some(x)))).text("Table to read")
     )
     val importArgs: scala.Seq[OParser[_, ArgsConfig]] = scala.Seq(
       opt[String]("query"),
@@ -26,7 +25,7 @@ object CmdParser {
     )
     OParser.sequence(
       programName("sdoob"),
-      head("Running Sdoob", s"version ${appVersion} with Scala library ${util.Properties.versionString}, Copyright ${copyrightBetween}, ${AppInfo.author}."),
+      head("Running Sdoob", s"version ${appVersion} with Scala library ${scalaVersion}, Copyright ${copyrightBetween}, ${appAuthor}."),
       help("help").text("List available commands and options"),
       opt[Unit]("version").action((_, c) => c.copy(appArgs = c.appArgs.copy(command = "version"))).text("Display version information"),
       // Spark args
