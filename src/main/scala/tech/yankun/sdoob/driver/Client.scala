@@ -48,11 +48,14 @@ abstract class Client(val options: SqlConnectOptions) extends Closeable {
 
   def isAuthenticated: Boolean = status == ST_CLIENT_AUTHENTICATED
 
+  def isClosed: Boolean = status == ST_CLIENT_CLOSED
+
 }
 
 object Client {
   val ST_CLIENT_CREATE = 0
   val ST_CLIENT_CONNECTED = 1
   val ST_CLIENT_AUTHENTICATED = 2
+  val ST_CLIENT_CLOSED = 3
 
 }
