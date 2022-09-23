@@ -2,12 +2,13 @@ package tech.yankun.sdoob.driver.mysql
 
 import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
 import org.log4s.getLogger
-import tech.yankun.sdoob.driver.command.{Command, CommandResponse, SdoobSimpleQueryCommand, SimpleQueryCommand}
-import tech.yankun.sdoob.driver.mysql.codec.{CommandCodec, InitialHandshakeCommandCodec, SdoobSimpleQueryCommandCodec, SimpleQueryCommandCodec}
+import tech.yankun.sdoob.driver.command._
+import tech.yankun.sdoob.driver.mysql.codec._
 import tech.yankun.sdoob.driver.mysql.command.InitialHandshakeCommand
 import tech.yankun.sdoob.driver.mysql.protocol.CapabilitiesFlag.{CLIENT_CONNECT_ATTRS, CLIENT_CONNECT_WITH_DB, CLIENT_FOUND_ROWS, CLIENT_SUPPORTED_CAPABILITIES_FLAGS}
 import tech.yankun.sdoob.driver.{Client, SqlConnectOptions}
 
+import java.net.SocketException
 import java.nio.channels.{SelectableChannel, SocketChannel}
 import java.nio.charset.Charset
 import java.util
@@ -57,7 +58,7 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
 
   def currentCodec: CommandCodec[_, MySQLClient] = flightCodec
 
-  def codecCompleted: Boolean = inflight.isEmpty
+  def codecCompleted: Boolean = inflight.isEmpty || isClosed
 
   def isInit: Boolean = inited
 
@@ -148,6 +149,7 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     val buf = getByteBuf(true)
     val writableBytes = buf.writableBytes()
     val read = buf.writeBytes(socket, writableBytes)
+    if (read == -1) throw new SocketException(s"client[${clientId}] socket has closed")
     logger.info(s"read channel $read bytes")
     while (decode(buf) && !pauseCodec) {}
   }
@@ -261,6 +263,7 @@ object MySQLClient {
       case command: SimpleQueryCommand =>
         new SimpleQueryCommandCodec(command)
       case command: SdoobSimpleQueryCommand => new SdoobSimpleQueryCommandCodec(command)
+      case CloseConnectionCommand => new CloseConnectionCommandCodec(CloseConnectionCommand)
       case _ =>
         ???
     }
