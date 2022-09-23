@@ -8,7 +8,7 @@ import tech.yankun.sdoob.driver.mysql.utils.BufferUtils
 import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
 import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField.{HOUR_OF_DAY, MICRO_OF_SECOND, MINUTE_OF_HOUR, SECOND_OF_MINUTE}
-import java.time.{Duration, LocalDate, LocalDateTime}
+import java.time.{Duration, LocalDate}
 
 /**
  *
@@ -29,13 +29,13 @@ object RowValueCodec {
       case DataType.YEAR => BufferUtils.readDecStrAsLong(length, payload).toShort
       case DataType.INT2 =>
         if (ColumnDefinition.isUnsignedNumeric(flags))
-          BufferUtils.readDecStrAsLong(length, payload).toInt
-        else BufferUtils.readDecStrAsLong(length, payload).toShort
+          BufferUtils.readDecStrAsLong(length, payload).toShort
+        else BufferUtils.readDecStrAsLong(length, payload).toInt
       case DataType.INT3 => BufferUtils.readDecStrAsLong(length, payload).toInt
       case DataType.INT4 =>
         if (ColumnDefinition.isUnsignedNumeric(flags))
-          BufferUtils.readDecStrAsLong(length, payload)
-        else BufferUtils.readDecStrAsLong(length, payload).toInt
+          BufferUtils.readDecStrAsLong(length, payload).toInt
+        else BufferUtils.readDecStrAsLong(length, payload)
       case DataType.INT8 =>
         if (ColumnDefinition.isUnsignedNumeric(flags))
           readTextNumeric(collationId, payload, length)
@@ -104,9 +104,9 @@ object RowValueCodec {
       Duration.ofHours(hour).plusMinutes(minute).plusSeconds(second).plusNanos(nanos)
   }
 
-  def readTextDateTime(collationId: Int, buffer: ByteBuf, len: Int): LocalDateTime = {
+  def readTextDateTime(collationId: Int, buffer: ByteBuf, len: Int): Any = {
     val date = readString(collationId, buffer, len)
-    if (date == "0000-00-00 00:00:00") null else LocalDateTime.parse(date, DEFAULT_FORMATTER)
+    if (date == "0000-00-00 00:00:00") null else java.sql.Timestamp.valueOf(date)
   }
 
   def readTextBlob(buffer: ByteBuf, len: Int): Array[Byte] = {

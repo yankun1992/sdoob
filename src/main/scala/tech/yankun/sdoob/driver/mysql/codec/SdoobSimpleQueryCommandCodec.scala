@@ -1,8 +1,8 @@
 package tech.yankun.sdoob.driver.mysql.codec
 
 import io.netty.buffer.ByteBuf
-import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.{StructField, StructType}
+import org.apache.spark.sql.{Row, RowGenerator}
 import tech.yankun.sdoob.driver.Dialect
 import tech.yankun.sdoob.driver.command.{SdoobSimpleQueryCommand, SimpleQueryCommand}
 import tech.yankun.sdoob.driver.mysql.codec.QueryCommandBaseCodec.{HANDLING_COLUMN_DEFINITION, HANDLING_ROW_DATA_OR_END_PACKET}
@@ -35,9 +35,10 @@ class SdoobSimpleQueryCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFor
       val dialect = Dialect.get("mysql")
       val fields = for (column <- columnDefinitions) yield {
         val datatype = dialect.getSparkType(column.jdbcType.getVendorTypeNumber, column.jdbcType.getName, column.columnLength.toInt) match {
-          case Some(value) => value
           case None =>
-            Dialect.getSparkType(column.jdbcType.getVendorTypeNumber, 0, 0, ColumnDefinition.isUnsignedNumeric(column.flags))
+            val signed = ColumnDefinition.isUnsignedNumeric(column.flags)
+            Dialect.getSparkType(column.jdbcType.getVendorTypeNumber, 0, 0, signed)
+          case Some(value) => value
         }
         StructField(column.name, datatype)
       }
@@ -51,6 +52,7 @@ class SdoobSimpleQueryCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFor
     val NULL: Short = 0xFB
     // decode result set row, TEXT format
     var index = 0
+    val row = new Array[Any](length)
     while (index < length) {
       var value: Any = null
       if (payload.getUnsignedByte(payload.readerIndex()) == NULL) {
@@ -60,10 +62,10 @@ class SdoobSimpleQueryCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFor
         // decode
         value = RowValueCodec.decodeText(definition.`type`, definition.characterSet, definition.flags, payload)
       }
-      rowBuffer.append(value)
+      row(index) = value
       index += 1
     }
-    collector.append(Row.fromSeq(rowBuffer))
+    collector.append(RowGenerator.generate(row))
     rowBuffer.clear()
   }
 
