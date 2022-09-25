@@ -15,18 +15,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package tech.yankun.sdoob.driver
+package tech.yankun.sdoob.driver.pg
 
-import io.netty.buffer.PooledByteBufAllocator
+import tech.yankun.sdoob.driver.SqlConnectOptions
 
-trait ClientPool {
-  def alloc: PooledByteBufAllocator
-}
+class PGConnectOptions extends SqlConnectOptions {
 
-object ClientPool {
-  def createPoolByUri(uri: String, poolOptions: PoolOptions): ClientPool = {
-    ???
-  }
-
-  def apply(connectOptions: SqlConnectOptions, poolOptions: PoolOptions): ClientPool = ???
 }

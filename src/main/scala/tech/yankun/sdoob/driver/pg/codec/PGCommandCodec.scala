@@ -15,18 +15,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package tech.yankun.sdoob.driver
+package tech.yankun.sdoob.driver.pg.codec
 
-import io.netty.buffer.PooledByteBufAllocator
+import tech.yankun.sdoob.driver.codec.CommandCodec
+import tech.yankun.sdoob.driver.command.Command
+import tech.yankun.sdoob.driver.pg.PGClient
 
-trait ClientPool {
-  def alloc: PooledByteBufAllocator
-}
-
-object ClientPool {
-  def createPoolByUri(uri: String, poolOptions: PoolOptions): ClientPool = {
-    ???
-  }
-
-  def apply(connectOptions: SqlConnectOptions, poolOptions: PoolOptions): ClientPool = ???
+abstract class PGCommandCodec[C <: Command](cmd: C) extends CommandCodec[C, PGClient](cmd) {
+  override def encode(client: PGClient): Unit = super.encode(client)
 }

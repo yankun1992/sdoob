@@ -5,14 +5,14 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.sql.{Row, RowGenerator}
 import tech.yankun.sdoob.driver.Dialect
 import tech.yankun.sdoob.driver.command.{SdoobSimpleQueryCommand, SimpleQueryCommand}
-import tech.yankun.sdoob.driver.mysql.codec.QueryCommandBaseCodec.{HANDLING_COLUMN_DEFINITION, HANDLING_ROW_DATA_OR_END_PACKET}
-import tech.yankun.sdoob.driver.mysql.datatype.{DataFormat, RowValueCodec}
+import tech.yankun.sdoob.driver.mysql.codec.QueryMySQLCommandBaseCodec.{HANDLING_COLUMN_DEFINITION, HANDLING_ROW_DATA_OR_END_PACKET}
+import tech.yankun.sdoob.driver.mysql.datatype.DataFormat
 import tech.yankun.sdoob.driver.mysql.protocol.ColumnDefinition
 
 import scala.collection.mutable
 
-class SdoobSimpleQueryCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFormat = DataFormat.TEXT)
-  extends SimpleQueryCommandCodec(SimpleQueryCommand(cmd.sql, cmd.singleton, cmd.autoCommit), format) {
+class SdoobSimpleQueryMySQLCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFormat = DataFormat.TEXT)
+  extends SimpleQueryMySQLCommandCodec(SimpleQueryCommand(cmd.sql, cmd.singleton, cmd.autoCommit), format) {
 
   private var schema: StructType = _
 
@@ -21,8 +21,6 @@ class SdoobSimpleQueryCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFor
   private var collector = mutable.ArrayBuffer.empty[Row]
 
   private var totalDecodeLen: Int = 0
-
-  private var rowBuffer: mutable.ArrayBuffer[Any] = _
 
   override def decodePayload(payload: ByteBuf, payloadLength: Int): Unit = {
     super.decodePayload(payload, payloadLength)
@@ -43,30 +41,12 @@ class SdoobSimpleQueryCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFor
         StructField(column.name, datatype)
       }
       schema = StructType(fields)
-      rowBuffer = new mutable.ArrayBuffer(columnDefinitions.length)
     }
   }
 
   override protected def decodeRow(length: Int, payload: ByteBuf): Unit = {
-    // const
-    val NULL: Short = 0xFB
-    // decode result set row, TEXT format
-    var index = 0
-    val row = new Array[Any](length)
-    while (index < length) {
-      var value: Any = null
-      if (payload.getUnsignedByte(payload.readerIndex()) == NULL) {
-        payload.skipBytes(1)
-      } else {
-        val definition = columnDefinitions(index)
-        // decode
-        value = RowValueCodec.decodeText(definition.`type`, definition.characterSet, definition.flags, payload)
-      }
-      row(index) = value
-      index += 1
-    }
+    val row = doDecodeRow(length, payload)
     collector.append(RowGenerator.generate(row))
-    rowBuffer.clear()
   }
 
   def getTotalDecodeLen: Int = totalDecodeLen

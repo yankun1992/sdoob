@@ -15,18 +15,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package tech.yankun.sdoob.driver
+package tech.yankun.sdoob.driver.checker
 
-import io.netty.buffer.PooledByteBufAllocator
+import io.netty.buffer.ByteBuf
+import tech.yankun.sdoob.driver.checker.PacketChecker.PacketState
 
-trait ClientPool {
-  def alloc: PooledByteBufAllocator
+/**
+ * A abstract to check database message whether complete
+ */
+trait PacketChecker {
+  def check(buffer: ByteBuf): PacketState
 }
 
-object ClientPool {
-  def createPoolByUri(uri: String, poolOptions: PoolOptions): ClientPool = {
-    ???
-  }
+object PacketChecker {
+  type PacketState = Int
+  /** message packet is not complete */
+  val NO_FULL_PACKET: PacketState = 0
+  /** only one complete message packet */
+  val ONLY_ONE_PACKET: PacketState = 1
+  /** more than one message packet */
+  val MORE_THAN_ONE_PACKET: PacketState = 2
 
-  def apply(connectOptions: SqlConnectOptions, poolOptions: PoolOptions): ClientPool = ???
+  val NO_PACKET: PacketState = 3
 }

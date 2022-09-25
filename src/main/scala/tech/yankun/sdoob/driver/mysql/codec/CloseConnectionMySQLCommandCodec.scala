@@ -7,10 +7,10 @@ import tech.yankun.sdoob.driver.command.CloseConnectionCommand
 import tech.yankun.sdoob.driver.mysql.MySQLClient
 import tech.yankun.sdoob.driver.mysql.protocol.CommandType
 
-class CloseConnectionCommandCodec(cmd: CloseConnectionCommand.type)
-  extends CommandCodec[CloseConnectionCommand.type, MySQLClient](cmd) {
+class CloseConnectionMySQLCommandCodec(cmd: CloseConnectionCommand.type)
+  extends MySQLCommandCodec[CloseConnectionCommand.type](cmd) {
 
-  import CloseConnectionCommandCodec._
+  import CloseConnectionMySQLCommandCodec._
 
   private[this] val logger = getLogger
 
@@ -39,6 +39,6 @@ class CloseConnectionCommandCodec(cmd: CloseConnectionCommand.type)
   }
 }
 
-object CloseConnectionCommandCodec {
+object CloseConnectionMySQLCommandCodec {
   protected val PAYLOAD_LENGTH: Int = 1
 }

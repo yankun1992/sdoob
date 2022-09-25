@@ -3,7 +3,7 @@ package tech.yankun.sdoob.driver.mysql.codec
 import io.netty.buffer.ByteBuf
 import org.log4s._
 import tech.yankun.sdoob.driver.Client.ST_CLIENT_AUTHENTICATED
-import tech.yankun.sdoob.driver.mysql.codec.AuthenticationCommandBaseCodec.{AUTH_MORE_DATA_STATUS_FLAG, AUTH_SWITCH_REQUEST_STATUS_FLAG, NONCE_LENGTH}
+import tech.yankun.sdoob.driver.mysql.codec.AuthenticationMySQLCommandBaseCodec.{AUTH_MORE_DATA_STATUS_FLAG, AUTH_SWITCH_REQUEST_STATUS_FLAG, NONCE_LENGTH}
 import tech.yankun.sdoob.driver.mysql.command.InitialHandshakeCommand
 import tech.yankun.sdoob.driver.mysql.protocol.CapabilitiesFlag
 import tech.yankun.sdoob.driver.mysql.protocol.CapabilitiesFlag._
@@ -13,10 +13,10 @@ import tech.yankun.sdoob.driver.mysql.{MySQLAuthenticationPlugin, MySQLDatabaseM
 
 import java.nio.charset.StandardCharsets
 
-class InitialHandshakeCommandCodec(cmd: InitialHandshakeCommand)
-  extends AuthenticationCommandBaseCodec[InitialHandshakeCommand](cmd) {
+class InitialHandshakeMySQLCommandCodec(cmd: InitialHandshakeCommand)
+  extends AuthenticationMySQLCommandBaseCodec[InitialHandshakeCommand](cmd) {
 
-  import InitialHandshakeCommandCodec._
+  import InitialHandshakeMySQLCommandCodec._
 
   private[this] val logger = getLogger
 
@@ -208,7 +208,7 @@ class InitialHandshakeCommandCodec(cmd: InitialHandshakeCommand)
 
 }
 
-object InitialHandshakeCommandCodec {
+object InitialHandshakeMySQLCommandCodec {
   private val AUTH_PLUGIN_DATA_PART1_LENGTH = 8
 
   private val ST_CONNECTING = 0

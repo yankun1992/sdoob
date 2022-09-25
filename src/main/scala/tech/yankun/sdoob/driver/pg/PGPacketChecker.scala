@@ -17,34 +17,18 @@
 
 package tech.yankun.sdoob.driver.pg
 
+import io.netty.buffer.ByteBuf
 import tech.yankun.sdoob.driver.checker.PacketChecker
-import tech.yankun.sdoob.driver.command.{Command, CommandResponse}
-import tech.yankun.sdoob.driver.pg.codec.PGCommandCodec
-import tech.yankun.sdoob.driver.{Client, SqlConnectOptions}
+import tech.yankun.sdoob.driver.checker.PacketChecker.PacketState
 
-class PGClient(options: SqlConnectOptions, parent: Option[PGPool] = None)
-  extends Client[PGPool, PGCommandCodec[_]](options, parent) {
-
-
-  override val packetChecker: PacketChecker = new PGPacketChecker
-
-  override def initializeConfiguration(options: SqlConnectOptions): Unit = {}
-
-  override def write(command: Command): Unit = ???
-
-  override def read(): CommandResponse = ???
-
-  override def close(): Unit = ???
-
-  override def currentCodec: Nothing = ???
-
-  override def init(): Unit = ???
-
-  override def channelRead(): Unit = ???
-
-  override def wrap(cmd: Command): PGCommandCodec[_] = ???
-}
-
-object PGClient {
+class PGPacketChecker extends PacketChecker {
+  override def check(buffer: ByteBuf): PacketState = if (buffer.readableBytes() > 5) {
+    val start = buffer.readerIndex()
+    val length = buffer.getInt(start + 1)
+    val packetLength = length + 5
+    if (buffer.readableBytes() > packetLength) PacketChecker.MORE_THAN_ONE_PACKET
+    else if (buffer.readableBytes() == packetLength) PacketChecker.ONLY_ONE_PACKET
+    else PacketChecker.NO_FULL_PACKET // buffer.readableBytes() < packetLength
+  } else if (buffer.readableBytes() == 0) PacketChecker.NO_PACKET else PacketChecker.NO_FULL_PACKET
 
 }

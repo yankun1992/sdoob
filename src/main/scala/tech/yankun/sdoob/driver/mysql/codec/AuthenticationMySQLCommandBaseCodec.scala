@@ -2,16 +2,15 @@ package tech.yankun.sdoob.driver.mysql.codec
 
 import io.netty.buffer.ByteBuf
 import org.log4s.getLogger
-import tech.yankun.sdoob.driver.Client.ST_CLIENT_AUTHENTICATED
-import tech.yankun.sdoob.driver.mysql.MySQLClient
-import tech.yankun.sdoob.driver.mysql.codec.AuthenticationCommandBaseCodec.{AUTH_PUBLIC_KEY_REQUEST_FLAG, FAST_AUTH_STATUS_FLAG, FULL_AUTHENTICATION_STATUS_FLAG}
+import tech.yankun.sdoob.driver.mysql.codec.AuthenticationMySQLCommandBaseCodec.{AUTH_PUBLIC_KEY_REQUEST_FLAG, FAST_AUTH_STATUS_FLAG, FULL_AUTHENTICATION_STATUS_FLAG}
 import tech.yankun.sdoob.driver.mysql.command.AuthenticationCommandBase
 import tech.yankun.sdoob.driver.mysql.utils.{BufferUtils, RsaPublicKeyEncryptor}
 
 import java.nio.charset.StandardCharsets
 import java.util
 
-abstract class AuthenticationCommandBaseCodec[C <: AuthenticationCommandBase](cmd: C) extends CommandCodec[C, MySQLClient](cmd) {
+abstract class AuthenticationMySQLCommandBaseCodec[C <: AuthenticationCommandBase](cmd: C)
+  extends MySQLCommandCodec[C](cmd) {
   private[this] val logger = getLogger
 
   protected var authPluginData: Array[Byte] = _
@@ -78,7 +77,7 @@ abstract class AuthenticationCommandBaseCodec[C <: AuthenticationCommandBase](cm
   }
 }
 
-object AuthenticationCommandBaseCodec {
+object AuthenticationMySQLCommandBaseCodec {
   val NONCE_LENGTH = 20
   val AUTH_SWITCH_REQUEST_STATUS_FLAG = 0xFE
 

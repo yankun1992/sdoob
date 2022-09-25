@@ -3,16 +3,15 @@ package tech.yankun.sdoob.driver.mysql.codec
 import io.netty.buffer.ByteBuf
 import org.log4s.getLogger
 import tech.yankun.sdoob.driver.command.QueryCommandBase
-import tech.yankun.sdoob.driver.mysql.MySQLClient
 import tech.yankun.sdoob.driver.mysql.datatype.DataFormat
 import tech.yankun.sdoob.driver.mysql.protocol.ColumnDefinition
 import tech.yankun.sdoob.driver.mysql.protocol.Packets.{EOF_PACKET_HEADER, ERROR_PACKET_HEADER}
 import tech.yankun.sdoob.driver.mysql.utils.BufferUtils
 
-abstract class QueryCommandBaseCodec[C <: QueryCommandBase](cmd: C, val format: DataFormat)
-  extends CommandCodec[C, MySQLClient](cmd) {
+abstract class QueryMySQLCommandBaseCodec[C <: QueryCommandBase](cmd: C, val format: DataFormat)
+  extends MySQLCommandCodec[C](cmd) {
 
-  import QueryCommandBaseCodec._
+  import QueryMySQLCommandBaseCodec._
 
   private[this] val logger = getLogger
 
@@ -93,14 +92,13 @@ abstract class QueryCommandBaseCodec[C <: QueryCommandBase](cmd: C, val format: 
       handleSingleDecodingCompleted(serverStatusFlags, affectedRows, lastInsertId)
       client.handleCommandResponse(s"affect rows: ${affectedRows}")
     } else {
-      logger.info("decode rows")
       decodeRow(columnDefinitions.length, payload)
       client.release(payload)
     }
 
   }
 
-  protected def decodeRow(length: Int, payload: ByteBuf): Unit = {}
+  protected def decodeRow(length: Int, payload: ByteBuf): Unit
 
   protected def handleSingleDecodingCompleted(serverFlags: Int, affected: Long, lastId: Long): Unit = {
 
@@ -108,7 +106,7 @@ abstract class QueryCommandBaseCodec[C <: QueryCommandBase](cmd: C, val format: 
 
 }
 
-object QueryCommandBaseCodec {
+object QueryMySQLCommandBaseCodec {
   trait CommandHandlerState
 
   object INIT extends CommandHandlerState

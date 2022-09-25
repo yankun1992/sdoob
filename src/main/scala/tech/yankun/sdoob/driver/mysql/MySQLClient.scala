@@ -1,83 +1,58 @@
+/*
+ * Copyright (C) 2022  Yan Kun
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package tech.yankun.sdoob.driver.mysql
 
-import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
-import org.log4s.getLogger
+import io.netty.buffer.ByteBuf
+import tech.yankun.sdoob.driver.checker.PacketChecker._
 import tech.yankun.sdoob.driver.command._
 import tech.yankun.sdoob.driver.mysql.codec._
 import tech.yankun.sdoob.driver.mysql.command.InitialHandshakeCommand
-import tech.yankun.sdoob.driver.mysql.protocol.CapabilitiesFlag.{CLIENT_CONNECT_ATTRS, CLIENT_CONNECT_WITH_DB, CLIENT_FOUND_ROWS, CLIENT_SUPPORTED_CAPABILITIES_FLAGS}
+import tech.yankun.sdoob.driver.mysql.protocol.CapabilitiesFlag._
 import tech.yankun.sdoob.driver.{Client, SqlConnectOptions}
 
 import java.net.SocketException
-import java.nio.channels.{SelectableChannel, SocketChannel}
 import java.nio.charset.Charset
-import java.util
-import scala.beans.BeanProperty
 
-class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None) extends Client(options) {
+class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None)
+  extends Client[MySQLPool, MySQLCommandCodec[_]](options, parent) {
 
   import MySQLClient._
-
-  private[this] val logger = getLogger
 
   private var collation: MySQLCollation = _
   private var charsetEncoding: Charset = _
   private var useAffectedRows: Boolean = _
   //  private var sslMode: SslMode = _
-  private var serverRsaPublicKey: ByteBuf = null
+  private var serverRsaPublicKey: ByteBuf = _
 
   private var initialCapabilitiesFlags: Int = initCapabilitiesFlags(options.getDatabase)
 
   //  private var pipeliningLimit: Int = options.getPipeliningLimit
-
-  // mysql codec inflight
-  private val inflight: util.ArrayDeque[CommandCodec[_, MySQLClient]] = new util.ArrayDeque[CommandCodec[_, MySQLClient]]()
-
-  // current running codec
-  private var flightCodec: CommandCodec[_, MySQLClient] = null
 
   var clientCapabilitiesFlag: Int = _
   var encodingCharset: Charset = _
 
   var metadata: MySQLDatabaseMetadata = _
 
-  val allocator: PooledByteBufAllocator = parent.map(_.alloc).getOrElse(PooledByteBufAllocator.DEFAULT)
-  var buffer: ByteBuf = _
+  val packetChecker = new MySQLPacketChecker
 
-  @BeanProperty var bufferRemain: Boolean = false
-
-  val socket: SocketChannel = SocketChannel.open()
-
-  var inited: Boolean = false
-
-  private var pauseCodec: Boolean = false
-
-  def setPauseCodec(status: Boolean): Unit = pauseCodec = status
-
-  def clientIsPause: Boolean = pauseCodec
-
-  def currentCodec: CommandCodec[_, MySQLClient] = flightCodec
+  def currentCodec: MySQLCommandCodec[_] = flightCodec
 
   def codecCompleted: Boolean = inflight.isEmpty || isClosed
-
-  def isInit: Boolean = inited
-
-  def connect(): Unit = {
-    // connect to server
-    try {
-      socket.connect(server)
-    } catch {
-      case x: Throwable =>
-        try socket.close()
-        catch {
-          case suppressed: Throwable =>
-            x.addSuppressed(suppressed)
-        }
-        throw x
-    }
-
-    this.status = Client.ST_CLIENT_CONNECTED
-  }
 
   def init(): Unit = {
     sendStartupMessage(options.getUser, options.getPassword, options.getDatabase, collation,
@@ -87,8 +62,6 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     inited = true
     logger.info(s"client[${clientId}] send startup message")
   }
-
-  def configureBlocking(block: Boolean): SelectableChannel = socket.configureBlocking(block)
 
   override def initializeConfiguration(options: SqlConnectOptions): Unit = {
     val myOptions = options.asInstanceOf[MySQLConnectOptions]
@@ -120,13 +93,12 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
   }
 
   override def write(command: Command): Unit = {
-    val codec: CommandCodec[_, MySQLClient] = wrap(command)
+    val codec: MySQLCommandCodec[_] = wrap(command)
     if (inflight.isEmpty) flightCodec = codec
     inflight.addLast(codec)
     codec.encode(this)
   }
 
-  def writeable: Boolean = isAuthenticated && inflight.isEmpty
 
   def handleCommandResponse(res: AnyRef): Unit = {
     val codec = inflight.poll()
@@ -139,26 +111,36 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     }
   }
 
-  override def sendPacket(packet: ByteBuf): Unit = {
-    val len = packet.readableBytes()
-    val writeLen = packet.readBytes(socket, len)
-    assert(len == writeLen)
-  }
-
-  def readChannel(): Unit = {
+  def channelRead(): Unit = {
     val buf = getByteBuf(true)
     val writableBytes = buf.writableBytes()
     val read = buf.writeBytes(socket, writableBytes)
     if (read == -1) throw new SocketException(s"client[${clientId}] socket has closed")
-    logger.info(s"read channel $read bytes")
-    while (decode(buf) && !pauseCodec) {}
+    var bufferState: PacketState = packetChecker.check(buf)
+    while (bufferState != NO_FULL_PACKET && bufferState != NO_PACKET) {
+      bufferState match {
+        case ONLY_ONE_PACKET =>
+          bufferRemain = false
+          decodePacket(buf)
+          bufferState = NO_PACKET
+        case MORE_THAN_ONE_PACKET =>
+          bufferRemain = true
+          this.buffer = buf
+          decodePacket(buf)
+          bufferState = packetChecker.check(buf)
+      }
+    }
+    if (bufferState == NO_FULL_PACKET) {
+      bufferRemain = true
+      this.buffer = buf
+      discard()
+    }
   }
 
   def getByteBuf(inRead: Boolean = false): ByteBuf = {
     if (bufferRemain && inRead) {
       buffer
     } else if (inRead) {
-      //      assert(this.buffer == null)
       this.buffer = allocator.directBuffer(BUFFER_SIZE)
       this.buffer
     } else {
@@ -169,9 +151,7 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
   def release(buffer: ByteBuf): Unit = {
     if (buffer != this.buffer) {
       buffer.release()
-    } else if (bufferRemain) {
-      //      this.buffer.discardReadBytes()
-    } else if (!bufferRemain && parent.isEmpty) {
+    } else if (bufferRemain) {} else if (!bufferRemain && parent.isEmpty) {
       this.buffer.clear()
       bufferRemain = true
     } else {
@@ -193,42 +173,15 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     }
   }
 
-  protected def decode(in: ByteBuf): Boolean = if (in.readableBytes() > 4) {
-    val packetStart = in.readerIndex()
-    val length = in.readUnsignedMediumLE()
-    val sequenceId: Int = in.readUnsignedByte()
-
-    if (in.readableBytes() == length) {
-      //      logger.info(s"client[${clientId}] decode payload with ${length} len")
-      bufferRemain = false
-      decodePacket(in, length, sequenceId)
-      false
-    } else if (in.readableBytes() > length) {
-      bufferRemain = true
-      this.buffer = in
-      //      logger.info(s"client[${clientId}] packet remain len ${in.readableBytes() - length}, current decode ${length} payload")
-      decodePacket(in, length, sequenceId)
-      in.readerIndex(packetStart + 4 + length)
-      true
-    } else {
-      bufferRemain = true
-      this.buffer = in
-      in.readerIndex(packetStart)
-      discard()
-      false
-    }
-  } else {
-    bufferRemain = true
-    this.buffer = in
-    discard()
-    false
-  }
-
-  private def decodePacket(payload: ByteBuf, length: Int, sequenceId: Int): Unit = {
+  private def decodePacket(payload: ByteBuf): Unit = {
+    val packetStart = payload.readerIndex()
+    val length = payload.readUnsignedMediumLE()
+    val sequenceId: Int = payload.readUnsignedByte()
     val codec = inflight.peek()
     flightCodec = codec
     codec.sequenceId = sequenceId + 1
     codec.decodePayload(payload, length)
+    if (bufferRemain && buffer.isReadable) buffer.readerIndex(packetStart + 4 + length)
   }
 
   override def read(): CommandResponse = ???
@@ -250,24 +203,23 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     flags
   }
 
+  override def wrap(cmd: Command): MySQLCommandCodec[_] = cmd match {
+    case command: InitialHandshakeCommand =>
+      new InitialHandshakeMySQLCommandCodec(command)
+    case command: SimpleQueryCommand =>
+      new SimpleQueryMySQLCommandCodec(command)
+    case command: SdoobSimpleQueryCommand => new SdoobSimpleQueryMySQLCommandCodec(command)
+    case CloseConnectionCommand => new CloseConnectionMySQLCommandCodec(CloseConnectionCommand)
+    case _ =>
+      ???
+  }
+
+
 }
 
 object MySQLClient {
   protected val BUFFER_SIZE: Int = 8 * 1024
   protected val BIG_BUFFER_SIZE: Int = 128 * 1024
-
-  def wrap(cmd: Command): CommandCodec[_, MySQLClient] = {
-    cmd match {
-      case command: InitialHandshakeCommand =>
-        new InitialHandshakeCommandCodec(command)
-      case command: SimpleQueryCommand =>
-        new SimpleQueryCommandCodec(command)
-      case command: SdoobSimpleQueryCommand => new SdoobSimpleQueryCommandCodec(command)
-      case CloseConnectionCommand => new CloseConnectionCommandCodec(CloseConnectionCommand)
-      case _ =>
-        ???
-    }
-  }
 
 
 }

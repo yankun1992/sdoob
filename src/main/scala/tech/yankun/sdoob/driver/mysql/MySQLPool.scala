@@ -2,11 +2,11 @@ package tech.yankun.sdoob.driver.mysql
 
 import io.netty.buffer.PooledByteBufAllocator
 import org.log4s.getLogger
-import tech.yankun.sdoob.driver.PoolOptions
+import tech.yankun.sdoob.driver.{ClientPool, PoolOptions}
 
 import java.nio.channels.{SelectionKey, Selector}
 
-class MySQLPool(options: PoolOptions, connectOptions: MySQLConnectOptions) {
+class MySQLPool(options: PoolOptions, connectOptions: MySQLConnectOptions) extends ClientPool {
 
   private[this] val logger = getLogger
 
@@ -41,7 +41,7 @@ class MySQLPool(options: PoolOptions, connectOptions: MySQLConnectOptions) {
         if (!client.isInit) {
           client.init()
         }
-        client.readChannel()
+        client.channelRead()
         if (client.isAuthenticated) {
           connectedClients.put(client.getClientId, client)
         }
@@ -68,7 +68,7 @@ class MySQLPool(options: PoolOptions, connectOptions: MySQLConnectOptions) {
         keys.remove()
         if (key.isReadable) {
           val client = key.attachment().asInstanceOf[MySQLClient]
-          client.readChannel()
+          client.channelRead()
           if (client.writeable) {
             existsWriteable = true
           }

@@ -1,15 +1,40 @@
+/*
+ * Copyright (C) 2022  Yan Kun
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package tech.yankun.sdoob.driver
 
-import io.netty.buffer.ByteBuf
+import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
+import org.log4s.{Logger, getLogger}
+import tech.yankun.sdoob.driver.checker.PacketChecker
+import tech.yankun.sdoob.driver.codec.CommandCodec
 import tech.yankun.sdoob.driver.command.{Command, CommandResponse}
 
 import java.io.Closeable
 import java.net.SocketAddress
+import java.nio.channels.{SelectableChannel, SocketChannel}
+import java.util
 import scala.beans.BeanProperty
 
-abstract class Client(val options: SqlConnectOptions) extends Closeable {
+abstract class Client[P <: ClientPool, CODEC <: CommandCodec[_, _]](val options: SqlConnectOptions, parent: Option[P] = None)
+  extends Closeable {
 
   import Client._
+
+  protected val logger: Logger = getLogger
 
   val properties: Map[String, String] = options.getProperties
   val server: SocketAddress = options.getSocketAddress
@@ -27,6 +52,48 @@ abstract class Client(val options: SqlConnectOptions) extends Closeable {
 
   initializeConfiguration(options)
 
+  val socket: SocketChannel = SocketChannel.open()
+
+  val allocator: PooledByteBufAllocator = parent.map(_.alloc).getOrElse(PooledByteBufAllocator.DEFAULT)
+
+  var buffer: ByteBuf = _
+
+  // database codec inflight
+  protected val inflight: util.ArrayDeque[CODEC] = new util.ArrayDeque[CODEC]()
+
+  // current running codec
+  protected var flightCodec: CODEC = _
+
+  val packetChecker: PacketChecker
+
+  @BeanProperty var bufferRemain: Boolean = false
+
+  protected var inited: Boolean = false
+
+  def currentCodec: CODEC
+
+  def isInit: Boolean = inited
+
+  def init(): Unit
+
+  def configureBlocking(block: Boolean): SelectableChannel = socket.configureBlocking(block)
+
+  def connect(): Unit = {
+    // connect to server
+    try {
+      socket.connect(server)
+    } catch {
+      case x: Throwable =>
+        try socket.close()
+        catch {
+          case suppressed: Throwable => x.addSuppressed(suppressed)
+        }
+        throw x
+    }
+
+    this.status = Client.ST_CLIENT_CONNECTED
+  }
+
 
   /**
    * Initialize the configuration after the common configuration have been initialized.
@@ -35,10 +102,17 @@ abstract class Client(val options: SqlConnectOptions) extends Closeable {
    */
   def initializeConfiguration(options: SqlConnectOptions): Unit
 
+  def channelRead(): Unit
 
   def write(command: Command): Unit
 
-  def sendPacket(packet: ByteBuf): Unit
+  def writeable: Boolean = isAuthenticated && inflight.isEmpty
+
+  def sendPacket(packet: ByteBuf): Unit = {
+    val len = packet.readableBytes()
+    val writeLen = packet.readBytes(socket, len)
+    assert(len == writeLen)
+  }
 
   def isSsl: Boolean = false
 
@@ -49,6 +123,8 @@ abstract class Client(val options: SqlConnectOptions) extends Closeable {
   def isAuthenticated: Boolean = status == ST_CLIENT_AUTHENTICATED
 
   def isClosed: Boolean = status == ST_CLIENT_CLOSED
+
+  def wrap(cmd: Command): CODEC
 
 }
 
