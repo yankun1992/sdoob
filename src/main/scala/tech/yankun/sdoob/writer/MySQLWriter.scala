@@ -17,14 +17,24 @@
 
 package tech.yankun.sdoob.writer
 
-sealed trait WriteMode
+import org.apache.spark.sql.{DataFrame, Row}
+import tech.yankun.sdoob.args.AppArgs
+import tech.yankun.sdoob.driver.PoolOptions
+import tech.yankun.sdoob.driver.mysql.MySQLConnectOptions
 
-object WriteMode {
-  object INSERT extends WriteMode
+class MySQLWriter(connectOptions: MySQLConnectOptions, poolOptions: PoolOptions, appArgs: AppArgs)
+  extends Writer(connectOptions, poolOptions, appArgs) {
 
-  object UPDATE extends WriteMode
+  override def write(dataset: DataFrame, mode: WriteMode): Unit = {
+    val schema = dataset.schema
 
-  object MERGE extends WriteMode
+    dataset.foreachPartition { partition: Iterator[Row] =>
+
+    }
+  }
 }
 
-
+object MySQLWriter {
+  def apply(connectOptions: MySQLConnectOptions, poolOptions: PoolOptions, appArgs: AppArgs): MySQLWriter =
+    new MySQLWriter(connectOptions, poolOptions, appArgs)
+}

@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2022  Yan Kun
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package tech.yankun.sdoob.reader
 
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
@@ -5,7 +22,7 @@ import org.apache.spark.storage.StorageLevel
 import org.log4s.getLogger
 import tech.yankun.sdoob.args.AppArgs
 import tech.yankun.sdoob.driver.command.{CloseConnectionCommand, Command, SdoobSimpleQueryCommand}
-import tech.yankun.sdoob.driver.mysql.codec.{CommandCodec, SdoobSimpleQueryCommandCodec}
+import tech.yankun.sdoob.driver.mysql.codec.{MySQLCommandCodec, SdoobSimpleQueryMySQLCommandCodec}
 import tech.yankun.sdoob.driver.mysql.{MySQLClient, MySQLConnectOptions}
 
 class MySQLReader(connectOptions: MySQLConnectOptions, appArgs: AppArgs)
@@ -47,7 +64,7 @@ class MySQLReader(connectOptions: MySQLConnectOptions, appArgs: AppArgs)
     val driverHolder = MySQLReader.DriverHolder
     driverHolder.initAndAuth(connectOptions)
     driverHolder.write(SdoobSimpleQueryCommand(schemaDetectionSql))
-    val currentCodec = driverHolder.currentCodec.asInstanceOf[SdoobSimpleQueryCommandCodec]
+    val currentCodec = driverHolder.currentCodec.asInstanceOf[SdoobSimpleQueryMySQLCommandCodec]
     driverHolder.completeCodec()
     val schema = currentCodec.getSchema
     driverHolder.close()
@@ -112,7 +129,7 @@ object MySQLReader extends Serializable {
       assert(this.client.isConnected)
       this.client.init()
       while (!this.client.isAuthenticated) {
-        this.client.readChannel()
+        this.client.channelRead()
       }
       logger.warn("create and auth mysql client")
     }
@@ -120,7 +137,7 @@ object MySQLReader extends Serializable {
     def close(): Unit = this.synchronized {
       if (client != null && !client.isClosed) {
         client.write(CloseConnectionCommand)
-        while (!client.codecCompleted) client.readChannel()
+        while (!client.codecCompleted) client.channelRead()
         isClosed = true
       }
     }
@@ -132,14 +149,14 @@ object MySQLReader extends Serializable {
     def isClose: Boolean = isClosed
 
     def completeCodec(): Unit = this.synchronized {
-      while (!client.codecCompleted) client.readChannel()
+      while (!client.codecCompleted) client.channelRead()
     }
 
     def write(command: Command): Unit = this.synchronized {
       client.write(command)
     }
 
-    def currentCodec: CommandCodec[_, MySQLClient] = client.currentCodec
+    def currentCodec: MySQLCommandCodec[_] = client.currentCodec
 
     override def finalize(): Unit = {
       if (client != null && !client.isClosed) close()
@@ -165,7 +182,7 @@ object MySQLReader extends Serializable {
   object ExecutorHolder extends ClientHolder with Executor {
     private var executorQuerySend: Boolean = false
     private var readRowsEnd: Boolean = false
-    private var sdoobSimpleQueryCommandCodec: SdoobSimpleQueryCommandCodec = _
+    private var sdoobSimpleQueryCommandCodec: SdoobSimpleQueryMySQLCommandCodec = _
 
     def readCompleted: Boolean = readRowsEnd
 
@@ -173,13 +190,13 @@ object MySQLReader extends Serializable {
       if (!executorQuerySend) {
         executorQuerySend = true
         client.write(SdoobSimpleQueryCommand(sql))
-        sdoobSimpleQueryCommandCodec = currentCodec.asInstanceOf[SdoobSimpleQueryCommandCodec]
+        sdoobSimpleQueryCommandCodec = currentCodec.asInstanceOf[SdoobSimpleQueryMySQLCommandCodec]
         logger.warn("execute fetch sql")
       }
     }
 
     def readRows: Iterator[Row] = this.synchronized {
-      while (!client.codecCompleted && sdoobSimpleQueryCommandCodec.getTotalDecodeLen < 64 * 1024 * 1024) client.readChannel()
+      while (!client.codecCompleted && sdoobSimpleQueryCommandCodec.getTotalDecodeLen < 64 * 1024 * 1024) client.channelRead()
       val rows = sdoobSimpleQueryCommandCodec.moveRows
       if (client.codecCompleted) {
         readRowsEnd = true
