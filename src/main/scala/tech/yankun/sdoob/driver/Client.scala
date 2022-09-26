@@ -20,16 +20,17 @@ package tech.yankun.sdoob.driver
 import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
 import org.log4s.{Logger, getLogger}
 import tech.yankun.sdoob.driver.checker.PacketChecker
+import tech.yankun.sdoob.driver.checker.PacketChecker._
 import tech.yankun.sdoob.driver.codec.CommandCodec
 import tech.yankun.sdoob.driver.command.{Command, CommandResponse}
 
 import java.io.Closeable
-import java.net.SocketAddress
+import java.net.{SocketAddress, SocketException}
 import java.nio.channels.{SelectableChannel, SocketChannel}
 import java.util
 import scala.beans.BeanProperty
 
-abstract class Client[P <: ClientPool, CODEC <: CommandCodec[_, _]](val options: SqlConnectOptions, parent: Option[P] = None)
+abstract class Client[P <: ClientPool, CODEC <: CommandCodec[_ <: Command, _]](val options: SqlConnectOptions, parent: Option[P] = None)
   extends Closeable {
 
   import Client._
@@ -62,7 +63,7 @@ abstract class Client[P <: ClientPool, CODEC <: CommandCodec[_, _]](val options:
   protected val inflight: util.ArrayDeque[CODEC] = new util.ArrayDeque[CODEC]()
 
   // current running codec
-  protected var flightCodec: CODEC = _
+  protected var flightCodec: Option[CODEC] = None
 
   val packetChecker: PacketChecker
 
@@ -70,11 +71,13 @@ abstract class Client[P <: ClientPool, CODEC <: CommandCodec[_, _]](val options:
 
   protected var inited: Boolean = false
 
-  def currentCodec: CODEC
+  def codecCompleted: Boolean = inflight.isEmpty || isClosed
+
+  def currentCodec: CODEC = flightCodec.get
 
   def isInit: Boolean = inited
 
-  def init(): Unit
+  def init(): Unit = inited = true
 
   def configureBlocking(block: Boolean): SelectableChannel = socket.configureBlocking(block)
 
@@ -102,7 +105,33 @@ abstract class Client[P <: ClientPool, CODEC <: CommandCodec[_, _]](val options:
    */
   def initializeConfiguration(options: SqlConnectOptions): Unit
 
-  def channelRead(): Unit
+  def channelRead(): Unit = {
+    val buf = getByteBuf(true)
+    val writableBytes = buf.writableBytes()
+    val read = buf.writeBytes(socket, writableBytes)
+    if (read == -1) throw new SocketException(s"client[${clientId}] socket has closed")
+    var bufferState: PacketState = packetChecker.check(buf)
+    while (bufferState != NO_FULL_PACKET && bufferState != NO_PACKET) {
+      bufferState match {
+        case ONLY_ONE_PACKET =>
+          bufferRemain = false
+          decodePacket(buf)
+          bufferState = NO_PACKET
+        case MORE_THAN_ONE_PACKET =>
+          bufferRemain = true
+          this.buffer = buf
+          decodePacket(buf)
+          bufferState = packetChecker.check(buf)
+      }
+    }
+    if (bufferState == NO_FULL_PACKET) {
+      bufferRemain = true
+      this.buffer = buf
+      discard()
+    }
+  }
+
+  protected def decodePacket(packet: ByteBuf): Unit
 
   def write(command: Command): Unit
 
@@ -112,6 +141,17 @@ abstract class Client[P <: ClientPool, CODEC <: CommandCodec[_, _]](val options:
     val len = packet.readableBytes()
     val writeLen = packet.readBytes(socket, len)
     assert(len == writeLen)
+  }
+
+  def handleCommandResponse(res: AnyRef): Unit = {
+    val codec = inflight.poll()
+    if (!inflight.isEmpty) flightCodec = Some(inflight.peek()) else flightCodec = None
+    res match {
+      case exception: Exception =>
+        throw exception
+      case _ =>
+        logger.info(s"Command[${codec.cmd}] response is ${res}")
+    }
   }
 
   def isSsl: Boolean = false
@@ -124,7 +164,47 @@ abstract class Client[P <: ClientPool, CODEC <: CommandCodec[_, _]](val options:
 
   def isClosed: Boolean = status == ST_CLIENT_CLOSED
 
-  def wrap(cmd: Command): CODEC
+  protected def wrap(cmd: Command): CODEC
+
+  def getByteBuf(inRead: Boolean = false): ByteBuf = {
+    if (bufferRemain && inRead) {
+      buffer
+    } else if (inRead) {
+      this.buffer = allocator.directBuffer(BUFFER_SIZE)
+      this.buffer
+    } else if (!inRead && bufferRemain && this.buffer.readableBytes() == 0) {
+      this.buffer
+    } else {
+      allocator.directBuffer(BUFFER_SIZE)
+    }
+  }
+
+  def release(buffer: ByteBuf): Unit = {
+    if (buffer != this.buffer) {
+      buffer.release()
+    } else if (bufferRemain) {
+      if (buffer.readableBytes() == 0) buffer.clear()
+    } else if (!bufferRemain && parent.isEmpty) {
+      this.buffer.clear()
+      bufferRemain = true
+    } else {
+      this.buffer = null
+      buffer.release()
+    }
+  }
+
+  protected def discard(): Unit = if (this.buffer != null) {
+    if (this.buffer.readerIndex() > BUFFER_SIZE * 3.0 / 4.0) this.buffer.discardReadBytes()
+    else if (!this.buffer.isWritable && this.buffer.readerIndex() > 0) this.buffer.discardReadBytes()
+    else if (this.buffer.readerIndex() == 0 && !this.buffer.isWritable) {
+      // big payload , change buffer
+      val buffer = this.buffer
+      this.buffer = allocator.directBuffer(BIG_BUFFER_SIZE)
+      this.buffer.writeBytes(buffer)
+      buffer.release()
+      logger.warn("upgrade buffer to big buffer")
+    }
+  }
 
 }
 
@@ -133,5 +213,8 @@ object Client {
   val ST_CLIENT_CONNECTED = 1
   val ST_CLIENT_AUTHENTICATED = 2
   val ST_CLIENT_CLOSED = 3
+
+  protected val BUFFER_SIZE: Int = 8 * 1024
+  protected val BIG_BUFFER_SIZE: Int = 128 * 1024
 
 }

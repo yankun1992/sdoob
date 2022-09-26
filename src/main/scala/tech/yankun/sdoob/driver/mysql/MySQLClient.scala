@@ -18,20 +18,16 @@
 package tech.yankun.sdoob.driver.mysql
 
 import io.netty.buffer.ByteBuf
-import tech.yankun.sdoob.driver.checker.PacketChecker._
 import tech.yankun.sdoob.driver.command._
 import tech.yankun.sdoob.driver.mysql.codec._
 import tech.yankun.sdoob.driver.mysql.command.InitialHandshakeCommand
 import tech.yankun.sdoob.driver.mysql.protocol.CapabilitiesFlag._
 import tech.yankun.sdoob.driver.{Client, SqlConnectOptions}
 
-import java.net.SocketException
 import java.nio.charset.Charset
 
 class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None)
-  extends Client[MySQLPool, MySQLCommandCodec[_]](options, parent) {
-
-  import MySQLClient._
+  extends Client[MySQLPool, MySQLCommandCodec[_ <: Command]](options, parent) {
 
   private var collation: MySQLCollation = _
   private var charsetEncoding: Charset = _
@@ -50,16 +46,12 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
 
   val packetChecker = new MySQLPacketChecker
 
-  def currentCodec: MySQLCommandCodec[_] = flightCodec
-
-  def codecCompleted: Boolean = inflight.isEmpty || isClosed
-
-  def init(): Unit = {
+  override def init(): Unit = {
     sendStartupMessage(options.getUser, options.getPassword, options.getDatabase, collation,
       options.serverRsaPublicKeyValue, options.getProperties, options.getSslMode, initialCapabilitiesFlags,
       charsetEncoding, options.getAuthenticationPlugin
     )
-    inited = true
+    super.init()
     logger.info(s"client[${clientId}] send startup message")
   }
 
@@ -93,94 +85,20 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
   }
 
   override def write(command: Command): Unit = {
-    val codec: MySQLCommandCodec[_] = wrap(command)
-    if (inflight.isEmpty) flightCodec = codec
+    val codec: MySQLCommandCodec[_ <: Command] = wrap(command)
+    if (inflight.isEmpty) flightCodec = Some(codec)
     inflight.addLast(codec)
     codec.encode(this)
   }
 
-
-  def handleCommandResponse(res: AnyRef): Unit = {
-    val codec = inflight.poll()
-    if (!inflight.isEmpty) flightCodec = inflight.peek() else flightCodec = null
-    res match {
-      case exception: Exception =>
-        throw exception
-      case _ =>
-        logger.info(s"Command[${codec.cmd}] response is ${res}")
-    }
-  }
-
-  def channelRead(): Unit = {
-    val buf = getByteBuf(true)
-    val writableBytes = buf.writableBytes()
-    val read = buf.writeBytes(socket, writableBytes)
-    if (read == -1) throw new SocketException(s"client[${clientId}] socket has closed")
-    var bufferState: PacketState = packetChecker.check(buf)
-    while (bufferState != NO_FULL_PACKET && bufferState != NO_PACKET) {
-      bufferState match {
-        case ONLY_ONE_PACKET =>
-          bufferRemain = false
-          decodePacket(buf)
-          bufferState = NO_PACKET
-        case MORE_THAN_ONE_PACKET =>
-          bufferRemain = true
-          this.buffer = buf
-          decodePacket(buf)
-          bufferState = packetChecker.check(buf)
-      }
-    }
-    if (bufferState == NO_FULL_PACKET) {
-      bufferRemain = true
-      this.buffer = buf
-      discard()
-    }
-  }
-
-  def getByteBuf(inRead: Boolean = false): ByteBuf = {
-    if (bufferRemain && inRead) {
-      buffer
-    } else if (inRead) {
-      this.buffer = allocator.directBuffer(BUFFER_SIZE)
-      this.buffer
-    } else {
-      allocator.directBuffer(BUFFER_SIZE)
-    }
-  }
-
-  def release(buffer: ByteBuf): Unit = {
-    if (buffer != this.buffer) {
-      buffer.release()
-    } else if (bufferRemain) {} else if (!bufferRemain && parent.isEmpty) {
-      this.buffer.clear()
-      bufferRemain = true
-    } else {
-      this.buffer = null
-      buffer.release()
-    }
-  }
-
-  private def discard(): Unit = if (this.buffer != null) {
-    if (this.buffer.readerIndex() > BUFFER_SIZE * 3.0 / 4.0) this.buffer.discardReadBytes()
-    else if (!this.buffer.isWritable && this.buffer.readerIndex() > 0) this.buffer.discardReadBytes()
-    else if (this.buffer.readerIndex() == 0 && !this.buffer.isWritable) {
-      // big payload , change buffer
-      val buffer = this.buffer
-      this.buffer = allocator.directBuffer(BIG_BUFFER_SIZE)
-      this.buffer.writeBytes(buffer)
-      buffer.release()
-      logger.warn("upgrade buffer to big buffer")
-    }
-  }
-
-  private def decodePacket(payload: ByteBuf): Unit = {
-    val packetStart = payload.readerIndex()
-    val length = payload.readUnsignedMediumLE()
-    val sequenceId: Int = payload.readUnsignedByte()
+  override def decodePacket(packet: ByteBuf): Unit = {
+    val packetStart = packet.readerIndex()
+    val length = packet.readUnsignedMediumLE()
+    val sequenceId: Int = packet.readUnsignedByte()
     val codec = inflight.peek()
-    flightCodec = codec
+    flightCodec = Some(codec)
     codec.sequenceId = sequenceId + 1
-    codec.decodePayload(payload, length)
+    codec.decodePayload(packet, length)
     if (bufferRemain && buffer.isReadable) buffer.readerIndex(packetStart + 4 + length)
   }
 
@@ -203,7 +121,7 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     flags
   }
 
-  override def wrap(cmd: Command): MySQLCommandCodec[_] = cmd match {
+  override def wrap(cmd: Command): MySQLCommandCodec[_ <: Command] = cmd match {
     case command: InitialHandshakeCommand =>
       new InitialHandshakeMySQLCommandCodec(command)
     case command: SimpleQueryCommand =>
@@ -211,15 +129,12 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     case command: SdoobSimpleQueryCommand => new SdoobSimpleQueryMySQLCommandCodec(command)
     case CloseConnectionCommand => new CloseConnectionMySQLCommandCodec(CloseConnectionCommand)
     case _ =>
-      ???
+      throw new IllegalStateException(s"not supported database command: ${cmd}")
   }
-
 
 }
 
 object MySQLClient {
-  protected val BUFFER_SIZE: Int = 8 * 1024
-  protected val BIG_BUFFER_SIZE: Int = 128 * 1024
 
 
 }

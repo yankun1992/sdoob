@@ -21,4 +21,17 @@ import tech.yankun.sdoob.driver.SqlConnectOptions
 
 class PGConnectOptions extends SqlConnectOptions {
 
+  override protected def init(other: SqlConnectOptions): Unit = {
+    super.init(other)
+  }
+
+  addProperty("application_name", "vertx-pg-client")
+  addProperty("client_encoding", "utf8")
+  addProperty("DateStyle", "ISO")
+  addProperty("extra_float_digits", "2")
+
+}
+
+object PGConnectOptions {
+
 }

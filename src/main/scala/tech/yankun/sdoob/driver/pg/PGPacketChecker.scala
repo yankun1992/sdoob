@@ -22,10 +22,10 @@ import tech.yankun.sdoob.driver.checker.PacketChecker
 import tech.yankun.sdoob.driver.checker.PacketChecker.PacketState
 
 class PGPacketChecker extends PacketChecker {
-  override def check(buffer: ByteBuf): PacketState = if (buffer.readableBytes() > 5) {
+  override def check(buffer: ByteBuf): PacketState = if (buffer.readableBytes() >= 5) {
     val start = buffer.readerIndex()
     val length = buffer.getInt(start + 1)
-    val packetLength = length + 5
+    val packetLength = length + 1
     if (buffer.readableBytes() > packetLength) PacketChecker.MORE_THAN_ONE_PACKET
     else if (buffer.readableBytes() == packetLength) PacketChecker.ONLY_ONE_PACKET
     else PacketChecker.NO_FULL_PACKET // buffer.readableBytes() < packetLength
