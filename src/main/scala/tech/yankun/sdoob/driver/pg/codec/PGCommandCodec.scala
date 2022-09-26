@@ -84,6 +84,12 @@ abstract class PGCommandCodec[C <: Command](cmd: C) extends CommandCodec[C, PGCl
       tp = buffer.readByte()
     }
   }
+
+  protected def decodeReadyForQuery(payload: ByteBuf): Unit = {
+    val id: Byte = payload.readByte()
+    if (id == 'I') {} else if (id == 'T') {}
+  }
+
 }
 
 object PGCommandCodec {

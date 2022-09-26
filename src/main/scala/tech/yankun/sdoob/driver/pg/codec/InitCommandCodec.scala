@@ -19,6 +19,7 @@ package tech.yankun.sdoob.driver.pg.codec
 
 import io.netty.buffer.ByteBuf
 import org.log4s.{Logger, getLogger}
+import tech.yankun.sdoob.driver.Client
 import tech.yankun.sdoob.driver.command.InitCommand
 import tech.yankun.sdoob.driver.pg.PGClient
 import tech.yankun.sdoob.driver.pg.protocol.Constants
@@ -29,6 +30,8 @@ import java.nio.charset.StandardCharsets
 class InitCommandCodec(cmd: InitCommand) extends PGCommandCodec[InitCommand](cmd) {
 
   private val logger: Logger = getLogger
+
+  private var encoding: String = _
 
   private var scram: ScramAuthentication = _
 
@@ -63,7 +66,10 @@ class InitCommandCodec(cmd: InitCommand) extends PGCommandCodec[InitCommand](cmd
   override protected def decodeMessage(payload: ByteBuf, messageType: Byte, messageLength: Int): Unit = {
     super.decodeMessage(payload, messageType, messageLength)
     messageType match {
+      case Constants.MSG_TYPE_READY_FOR_QUERY => decodeReadyForQuery(payload)
       case Constants.MSG_TYPE_AUTHENTICATION => decodeAuthentication(payload, messageLength)
+      case Constants.MSG_TYPE_PARAMETER_STATUS => decodeParameterStatus(payload)
+      case Constants.MSG_TYPE_BACKEND_KEY_DATA => decodeBackendKeyData(payload)
     }
   }
 
@@ -149,6 +155,27 @@ class InitCommandCodec(cmd: InitCommand) extends PGCommandCodec[InitCommand](cmd
     sendPasswordMsg(cmd.password)
   }
 
+  private def decodeParameterStatus(buffer: ByteBuf): Unit = {
+    logger.debug("decodeParameterStatus")
+    val key = BufferUtils.readCString(buffer)
+    val value = BufferUtils.readCString(buffer)
+    client.release(buffer)
+    if (key == "client_encoding") encoding = value
+    if (key == "server_version") logger.warn(s"server_version is ${value}, set it to PGClient metadata")
+  }
+
+  private def decodeBackendKeyData(buffer: ByteBuf): Unit = {
+    val processId = buffer.readInt()
+    val secretKey = buffer.readInt()
+    client.release(buffer)
+    logger.warn(s"processId: ${processId}, secretKey: ${secretKey}, set it to PGClient")
+  }
+
+  override protected def decodeReadyForQuery(payload: ByteBuf): Unit = {
+    super.decodeReadyForQuery(payload)
+    client.handleCommandResponse("auth success")
+    client.setStatus(Client.ST_CLIENT_AUTHENTICATED)
+  }
 
   private def sendPasswordMsg(msg: String): Unit = {
     val packet = client.getByteBuf()
