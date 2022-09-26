@@ -25,6 +25,7 @@ lazy val root = (project in file("."))
     libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.3",
     libraryDependencies += "org.log4s" %% "log4s" % "1.10.0",
     libraryDependencies += "com.github.pathikrit" %% "better-files" % "3.9.1",
+    libraryDependencies += "com.ongres.scram" % "client" % "2.1",
     libraryDependencies += "org.apache.spark" %% "spark-sql" % packSparkVersion % "provided"
 
   )
