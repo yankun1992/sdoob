@@ -77,6 +77,7 @@ class InitCommandCodec(cmd: InitCommand) extends PGCommandCodec[InitCommand](cmd
     val tp = payload.readInt()
     tp match {
       case Constants.AUTH_TYPE_OK =>
+        client.release(payload)
         handleAuthenticationOK()
       case Constants.AUTH_TYPE_MD5_PASSWORD =>
         val salt = new Array[Byte](4)
@@ -173,6 +174,7 @@ class InitCommandCodec(cmd: InitCommand) extends PGCommandCodec[InitCommand](cmd
 
   override protected def decodeReadyForQuery(payload: ByteBuf): Unit = {
     super.decodeReadyForQuery(payload)
+    client.release(payload)
     client.handleCommandResponse("auth success")
     client.setStatus(Client.ST_CLIENT_AUTHENTICATED)
   }
