@@ -22,7 +22,7 @@ import org.apache.spark.storage.StorageLevel
 import org.log4s.getLogger
 import tech.yankun.sdoob.args.AppArgs
 import tech.yankun.sdoob.driver.command.{CloseConnectionCommand, Command, SdoobSimpleQueryCommand}
-import tech.yankun.sdoob.driver.mysql.codec.{MySQLCommandCodec, SdoobSimpleQueryMySQLCommandCodec}
+import tech.yankun.sdoob.driver.mysql.codec.{MySQLCommandCodec, SdoobSimpleQueryCommandCodec}
 import tech.yankun.sdoob.driver.mysql.{MySQLClient, MySQLConnectOptions}
 
 class MySQLReader(connectOptions: MySQLConnectOptions, appArgs: AppArgs)
@@ -64,7 +64,7 @@ class MySQLReader(connectOptions: MySQLConnectOptions, appArgs: AppArgs)
     val driverHolder = MySQLReader.DriverHolder
     driverHolder.initAndAuth(connectOptions)
     driverHolder.write(SdoobSimpleQueryCommand(schemaDetectionSql))
-    val currentCodec = driverHolder.currentCodec.asInstanceOf[SdoobSimpleQueryMySQLCommandCodec]
+    val currentCodec = driverHolder.currentCodec.asInstanceOf[SdoobSimpleQueryCommandCodec]
     driverHolder.completeCodec()
     val schema = currentCodec.getSchema
     driverHolder.close()
@@ -182,7 +182,7 @@ object MySQLReader extends Serializable {
   object ExecutorHolder extends ClientHolder with Executor {
     private var executorQuerySend: Boolean = false
     private var readRowsEnd: Boolean = false
-    private var sdoobSimpleQueryCommandCodec: SdoobSimpleQueryMySQLCommandCodec = _
+    private var sdoobSimpleQueryCommandCodec: SdoobSimpleQueryCommandCodec = _
 
     def readCompleted: Boolean = readRowsEnd
 
@@ -190,7 +190,7 @@ object MySQLReader extends Serializable {
       if (!executorQuerySend) {
         executorQuerySend = true
         client.write(SdoobSimpleQueryCommand(sql))
-        sdoobSimpleQueryCommandCodec = currentCodec.asInstanceOf[SdoobSimpleQueryMySQLCommandCodec]
+        sdoobSimpleQueryCommandCodec = currentCodec.asInstanceOf[SdoobSimpleQueryCommandCodec]
         logger.warn("execute fetch sql")
       }
     }

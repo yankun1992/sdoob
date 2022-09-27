@@ -2,7 +2,7 @@ package tech.yankun.sdoob.examples
 
 import tech.yankun.sdoob.driver.PoolOptions
 import tech.yankun.sdoob.driver.command.{CloseConnectionCommand, SdoobSimpleQueryCommand, SimpleQueryCommand}
-import tech.yankun.sdoob.driver.mysql.codec.SdoobSimpleQueryMySQLCommandCodec
+import tech.yankun.sdoob.driver.mysql.codec.SdoobSimpleQueryCommandCodec
 import tech.yankun.sdoob.driver.mysql.{MySQLClient, MySQLConnectOptions, MySQLPool}
 
 object MySQLExample {
@@ -21,7 +21,7 @@ object MySQLExample {
     }
     //    client.write(SimpleQueryCommand("select /*!40001 SQL_NO_CACHE */ * from test"))
     client.write(SdoobSimpleQueryCommand("select /*!40001 SQL_NO_CACHE */ * from test where 0=1"))
-    val currentCodec = client.currentCodec.asInstanceOf[SdoobSimpleQueryMySQLCommandCodec]
+    val currentCodec = client.currentCodec.asInstanceOf[SdoobSimpleQueryCommandCodec]
     while (!client.codecCompleted) {
       client.channelRead()
       if (currentCodec.getTotalDecodeLen >= 64 * 1024 * 1024) {

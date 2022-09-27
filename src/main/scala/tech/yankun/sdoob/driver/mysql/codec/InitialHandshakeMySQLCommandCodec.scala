@@ -95,6 +95,7 @@ class InitialHandshakeMySQLCommandCodec(cmd: InitialHandshakeCommand)
       case SslMode("required") => false
       case SslMode("verify_ca") => false
       case SslMode("verify_identity") => true
+      case _ => false
     }
     if (upgradeSsl) {
       logger.warn("ssl connect is not support")

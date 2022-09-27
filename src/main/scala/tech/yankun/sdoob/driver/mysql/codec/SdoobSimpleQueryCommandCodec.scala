@@ -3,16 +3,15 @@ package tech.yankun.sdoob.driver.mysql.codec
 import io.netty.buffer.ByteBuf
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.sql.{Row, RowGenerator}
-import tech.yankun.sdoob.driver.Dialect
+import tech.yankun.sdoob.driver.{DataFormat, Dialect}
 import tech.yankun.sdoob.driver.command.{SdoobSimpleQueryCommand, SimpleQueryCommand}
-import tech.yankun.sdoob.driver.mysql.codec.QueryMySQLCommandBaseCodec.{HANDLING_COLUMN_DEFINITION, HANDLING_ROW_DATA_OR_END_PACKET}
-import tech.yankun.sdoob.driver.mysql.datatype.DataFormat
+import tech.yankun.sdoob.driver.mysql.codec.QueryCommandBaseCodec.{HANDLING_COLUMN_DEFINITION, HANDLING_ROW_DATA_OR_END_PACKET}
 import tech.yankun.sdoob.driver.mysql.protocol.ColumnDefinition
 
 import scala.collection.mutable
 
-class SdoobSimpleQueryMySQLCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFormat = DataFormat.TEXT)
-  extends SimpleQueryMySQLCommandCodec(SimpleQueryCommand(cmd.sql, cmd.singleton, cmd.autoCommit), format) {
+class SdoobSimpleQueryCommandCodec(cmd: SdoobSimpleQueryCommand, format: DataFormat = DataFormat.TEXT)
+  extends SimpleQueryCommandCodec(SimpleQueryCommand(cmd.sql, cmd.singleton, cmd.autoCommit), format) {
 
   private var schema: StructType = _
 

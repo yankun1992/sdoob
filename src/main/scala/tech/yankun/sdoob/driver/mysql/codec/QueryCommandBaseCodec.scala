@@ -1,17 +1,34 @@
+/*
+ * Copyright (C) 2022  Yan Kun
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package tech.yankun.sdoob.driver.mysql.codec
 
 import io.netty.buffer.ByteBuf
 import org.log4s.getLogger
+import tech.yankun.sdoob.driver.DataFormat
 import tech.yankun.sdoob.driver.command.QueryCommandBase
-import tech.yankun.sdoob.driver.mysql.datatype.DataFormat
 import tech.yankun.sdoob.driver.mysql.protocol.ColumnDefinition
 import tech.yankun.sdoob.driver.mysql.protocol.Packets.{EOF_PACKET_HEADER, ERROR_PACKET_HEADER}
 import tech.yankun.sdoob.driver.mysql.utils.BufferUtils
 
-abstract class QueryMySQLCommandBaseCodec[C <: QueryCommandBase](cmd: C, val format: DataFormat)
+abstract class QueryCommandBaseCodec[C <: QueryCommandBase](cmd: C, val format: DataFormat)
   extends MySQLCommandCodec[C](cmd) {
 
-  import QueryMySQLCommandBaseCodec._
+  import QueryCommandBaseCodec._
 
   private[this] val logger = getLogger
 
@@ -106,7 +123,7 @@ abstract class QueryMySQLCommandBaseCodec[C <: QueryCommandBase](cmd: C, val for
 
 }
 
-object QueryMySQLCommandBaseCodec {
+object QueryCommandBaseCodec {
   trait CommandHandlerState
 
   object INIT extends CommandHandlerState

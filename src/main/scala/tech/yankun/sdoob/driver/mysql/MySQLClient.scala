@@ -125,8 +125,8 @@ class MySQLClient(options: MySQLConnectOptions, parent: Option[MySQLPool] = None
     case command: InitialHandshakeCommand =>
       new InitialHandshakeMySQLCommandCodec(command)
     case command: SimpleQueryCommand =>
-      new SimpleQueryMySQLCommandCodec(command)
-    case command: SdoobSimpleQueryCommand => new SdoobSimpleQueryMySQLCommandCodec(command)
+      new SimpleQueryCommandCodec(command)
+    case command: SdoobSimpleQueryCommand => new SdoobSimpleQueryCommandCodec(command)
     case CloseConnectionCommand => new CloseConnectionMySQLCommandCodec(CloseConnectionCommand)
     case _ =>
       throw new IllegalStateException(s"not supported database command: ${cmd}")
