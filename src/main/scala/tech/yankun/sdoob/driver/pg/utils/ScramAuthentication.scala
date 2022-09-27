@@ -51,7 +51,7 @@ case class ScramAuthentication(username: String, password: String) {
         s"SASL Authentication : only SCRAM-SHA-256 is currently supported, server wants ${mechanisms.mkString("[", ", ", "]")}")
     val scramClient = ScramClient.channelBinding(ScramClient.ChannelBinding.NO)
       .stringPreparation(StringPreparations.NO_PREPARATION)
-      .selectMechanismBasedOnServerAdvertised(mechanisms: _*)
+      .selectMechanismBasedOnServerAdvertised(mechanisms.toSeq: _*)
       .setup()
 
     session = scramClient.scramSession(username)
