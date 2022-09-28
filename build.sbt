@@ -18,8 +18,11 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := packScalaVersion
 
 lazy val root = (project in file("."))
+  .enablePlugins(BuildInfoPlugin)
   .settings(
     name := "sdoob",
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, "spark" -> packSparkVersion,
+      "author" -> "Yan Kun <1939810907@qq.com>", "license" -> "AGPL-3.0", "copyright" -> "2022"),
 
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
     libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.3",

@@ -1,13 +1,27 @@
+/*
+ * Copyright (C) 2022  Yan Kun
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package tech.yankun.sdoob.args
 
 import scopt.OParser
-import tech.yankun.sdoob.AppInfo._
-
-import java.time.LocalDate
+import tech.yankun.sdoob.AppInfo
 
 object CmdParser {
   private val builder = OParser.builder[ArgsConfig]
-  private val copyrightBetween = if (LocalDate.now().getYear == copyrightStart) s"${copyrightStart}" else s"${copyrightStart}-${LocalDate.now().getYear}"
 
   val parser: OParser[_, ArgsConfig] = {
     import builder._
@@ -25,7 +39,7 @@ object CmdParser {
     )
     OParser.sequence(
       programName("sdoob"),
-      head("Running Sdoob", s"version ${appVersion} with Scala library ${scalaVersion}, Copyright ${copyrightBetween}, ${appAuthor}."),
+      head("Running Sdoob", AppInfo.toString),
       help("help").text("List available commands and options"),
       opt[Unit]("version").action((_, c) => c.copy(appArgs = c.appArgs.copy(command = "version"))).text("Display version information"),
       // Spark args

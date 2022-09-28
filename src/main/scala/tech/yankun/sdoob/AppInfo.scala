@@ -18,27 +18,50 @@
 package tech.yankun.sdoob
 
 import better.files.File
+import buildinfo.BuildInfo
 
+import java.time.LocalDate
+
+/** build info for this application */
 object AppInfo {
-  def appVersion: String = System.getProperty("prog.version")
 
-  def appHome: String = System.getProperty("prog.home")
+  private val RE_COPYRIGHT_BETWEEN = "(\\d+)-(\\d+)".r
+  private val RE_COPYRIGHT = "(\\d+)".r
 
-  val copyrightStart = 2022
+  val name: String = BuildInfo.name
 
-  val appAuthor = "Yan Kun<1939810907@qq.com>"
+  val appVersion: String = BuildInfo.version
 
-  val scalaVersion = util.Properties.versionString
+  def appHome: String = Option(System.getProperty("prog.home")).getOrElse("target/pack")
 
-  def appDependencies: Seq[String] = {
-    val home = File(System.getProperty("prog.home"))
-    val appLib = home / "lib"
-    appLib.list.filter(f => !f.name.contains("scala-library") && !f.name.contains("sdoob_")).map(f => f.pathAsString).toSeq
+  val copyright: String = BuildInfo.copyright match {
+    case RE_COPYRIGHT_BETWEEN(start, end) => BuildInfo.copyright
+    case RE_COPYRIGHT(start) =>
+      if (LocalDate.now().getYear == start.toInt) start else s"$start-${LocalDate.now().getYear}"
+    case _ =>
+      if (LocalDate.now().getYear == 2022) "2022" else s"2022-${LocalDate.now().getYear}"
   }
 
-  def appJar: String = {
-    val home = File(System.getProperty("prog.home"))
-    val appLib = home / "lib"
-    appLib.list.filter(f => f.name.contains("sdoob_")).next().pathAsString
-  }
+  val appAuthor: String = BuildInfo.author
+
+  val scalaVersion: String = BuildInfo.scalaVersion
+
+  val license: String = BuildInfo.license
+
+  override def toString: String =
+    s"version ${appVersion} with Scala library ${scalaVersion} and compatible with spark ${BuildInfo.spark}, " +
+      s"Copyright (C) ${copyright} ${appAuthor} under ${license} license"
+
+  private def dependencies: Seq[File] = (File(appHome) / "lib").list.toSeq
+
+  /**
+   * dependencies for pass to spark-submit --jars
+   *
+   * @return dependencies
+   */
+  def appDependencies: Seq[String] =
+    dependencies.filter(f => !f.name.contains("scala-library") && !f.name.contains(s"${name}_")).map(f => f.pathAsString)
+
+  /** main class jar for running spark application */
+  def appJar: String = dependencies.filter(f => f.name.contains(s"${name}_")).head.pathAsString
 }
