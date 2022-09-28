@@ -1,5 +1,6 @@
 package tech.yankun.sdoob.examples
 
+import tech.yankun.sdoob.driver.command.SimpleQueryCommand
 import tech.yankun.sdoob.driver.pg.{PGClient, PGConnectOptions}
 
 object PGExample {
@@ -19,6 +20,12 @@ object PGExample {
     assert(client.isConnected)
     client.init()
     while (!client.isAuthenticated) {
+      client.channelRead()
+    }
+
+    client.write(SimpleQueryCommand("select * from test"))
+
+    while (!client.codecCompleted) {
       client.channelRead()
     }
   }

@@ -19,8 +19,8 @@ package tech.yankun.sdoob.driver.pg
 
 import io.netty.buffer.ByteBuf
 import tech.yankun.sdoob.driver.checker.PacketChecker
-import tech.yankun.sdoob.driver.command.{Command, CommandResponse, InitCommand}
-import tech.yankun.sdoob.driver.pg.codec.{InitCommandCodec, PGCommandCodec}
+import tech.yankun.sdoob.driver.command.{Command, CommandResponse, InitCommand, SimpleQueryCommand}
+import tech.yankun.sdoob.driver.pg.codec.{InitCommandCodec, PGCommandCodec, SimpleQueryCodec}
 import tech.yankun.sdoob.driver.{Client, SqlConnectOptions}
 
 class PGClient(options: SqlConnectOptions, parent: Option[PGPool] = None)
@@ -61,6 +61,7 @@ class PGClient(options: SqlConnectOptions, parent: Option[PGPool] = None)
 
   override def wrap(cmd: Command): PGCommandCodec[_ <: Command] = cmd match {
     case command: InitCommand => new InitCommandCodec(command)
+    case simpleQueryCommand: SimpleQueryCommand => new SimpleQueryCodec(simpleQueryCommand)
     case _ =>
       throw new IllegalStateException(s"not supported database command: ${cmd}")
   }
